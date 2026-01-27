@@ -1,0 +1,6 @@
+{
+  "additionalDirectories": [
+    "../src",
+    "../.project"
+  ]
+}

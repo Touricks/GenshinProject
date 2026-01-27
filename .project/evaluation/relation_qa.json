@@ -1,0 +1,60 @@
+{
+  "version": "1.0",
+  "description": "关系查询测试集 - 验证系统对人物关系和组织归属的理解能力",
+  "created_at": "2026-01-21",
+  "target_count": 20,
+  "items": [
+    {
+      "id": "rel_001",
+      "category": "organization",
+      "difficulty": "easy",
+      "question": "伊法属于哪个部族？",
+      "expected_answer": "花羽会",
+      "source": {
+        "file": "Data/1600/chapter0_dialogue.txt",
+        "line_range": [34, 34]
+      },
+      "keywords": ["花羽会"],
+      "notes": "恰斯卡说'我们部族的医生'"
+    },
+    {
+      "id": "rel_002",
+      "category": "character",
+      "difficulty": "easy",
+      "question": "咔库库和伊法是什么关系？",
+      "expected_answer": "咔库库是伊法的助理",
+      "source": {
+        "file": "Data/1600/chapter0_dialogue.txt",
+        "line_range": [34, 34]
+      },
+      "keywords": ["助理"],
+      "notes": ""
+    },
+    {
+      "id": "rel_003",
+      "category": "character",
+      "difficulty": "medium",
+      "question": "恰斯卡和玩家是什么关系？",
+      "expected_answer": "朋友/战友，曾一起作战",
+      "source": {
+        "file": "Data/1600/chapter0_dialogue.txt",
+        "line_range": [68, 68]
+      },
+      "keywords": ["朋友", "作战"],
+      "notes": "恰斯卡提到很久没一起作战了"
+    },
+    {
+      "id": "rel_004",
+      "category": "organization",
+      "difficulty": "medium",
+      "question": "恰斯卡在花羽会担任什么职责？",
+      "expected_answer": "巡逻/守卫",
+      "source": {
+        "file": "Data/1600/chapter0_dialogue.txt",
+        "line_range": [44, 44]
+      },
+      "keywords": ["巡逻"],
+      "notes": "她说在附近巡逻时发现绒翼龙"
+    }
+  ]
+}

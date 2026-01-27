@@ -1,0 +1,96 @@
+{
+  "version": "1.0",
+  "description": "多轮对话测试集 - 验证系统的上下文记忆和指代消解能力",
+  "created_at": "2026-01-21",
+  "target_count": 10,
+  "items": [
+    {
+      "id": "mt_001",
+      "scenario": "角色信息追问",
+      "description": "测试对角色信息的连续追问，验证指代消解",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "伊法是谁？",
+          "expected_points": ["花羽会的医生", "咔库库的主人"],
+          "requires_context": false
+        },
+        {
+          "turn": 2,
+          "user": "他的助理叫什么？",
+          "expected_points": ["咔库库"],
+          "requires_context": true,
+          "context_dependency": "需要理解'他'指代伊法"
+        },
+        {
+          "turn": 3,
+          "user": "它有什么特点？",
+          "expected_points": ["会学舌", "是一只龙"],
+          "requires_context": true,
+          "context_dependency": "需要理解'它'指代咔库库"
+        }
+      ]
+    },
+    {
+      "id": "mt_002",
+      "scenario": "事件因果追踪",
+      "description": "测试对事件因果链的理解",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "绒翼龙为什么受伤了？",
+          "expected_points": ["被秘源机兵袭击"],
+          "requires_context": false
+        },
+        {
+          "turn": 2,
+          "user": "是谁救了它？",
+          "expected_points": ["恰斯卡"],
+          "requires_context": true,
+          "context_dependency": "需要理解'它'指代绒翼龙"
+        },
+        {
+          "turn": 3,
+          "user": "她是怎么发现它的？",
+          "expected_points": ["在附近巡逻时", "海滩上"],
+          "requires_context": true,
+          "context_dependency": "需要理解'她'指代恰斯卡"
+        },
+        {
+          "turn": 4,
+          "user": "谁给它治的伤？",
+          "expected_points": ["伊法"],
+          "requires_context": true,
+          "context_dependency": "需要保持对绒翼龙的追踪"
+        }
+      ]
+    },
+    {
+      "id": "mt_003",
+      "scenario": "地点切换",
+      "description": "测试对地点相关信息的追问",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "花羽会是什么地方？",
+          "expected_points": ["一个部族", "恰斯卡、伊法所在"],
+          "requires_context": false
+        },
+        {
+          "turn": 2,
+          "user": "那里最近发生了什么？",
+          "expected_points": ["秘源机兵活动频繁", "龙和行商被袭击"],
+          "requires_context": true,
+          "context_dependency": "需要理解'那里'指代花羽会"
+        },
+        {
+          "turn": 3,
+          "user": "玩家接下来要离开这里去哪？",
+          "expected_points": ["挪德卡莱"],
+          "requires_context": true,
+          "context_dependency": "需要理解'这里'指代花羽会/纳塔"
+        }
+      ]
+    }
+  ]
+}
