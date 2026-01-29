@@ -3,6 +3,11 @@
 .env.local
 .env.*.local
 
+# Project internal (not for version control)
+.claude/
+.project/
+.devkit/
+
 # Data (large files, stored externally)
 Data/
 
