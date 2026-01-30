@@ -135,8 +135,7 @@
 
 | Option | Pros | Cons | Verdict |
 |--------|------|------|---------|
-| **LangChain Logic** | 简单直接，适合 Session Context | 需要自行管理持久化 | ✅ Selected |
-| Mem0 | 长期用户画像优秀 | 增加依赖，当前场景 Overkill | Deferred |
+| Mem0 | 长期用户画像优秀 | 增加依赖| Selected |
 | LlamaIndex ChatMemory | 框架绑定 | 灵活性一般 | Backup |
 
 **选择理由:**
@@ -236,7 +235,7 @@ dev_tools:
 |----------|--------|-----------|
 | 数据存储位置 | 本地 | PRD 要求无外传 |
 | 主 LLM | Gemini 3 Pro | GCP 学生免费额度 |
-| Fallback LLM | Claude Sonnet 4 | 备用，应对特殊场景 |
+| Fallback LLM | GPT 4 | 备用，应对特殊场景 |
 | 中文 Embedding | BGE-base-zh-v1.5 | 中文 SOTA，本地部署 |
 | Reranker | Jina Reranker v2 | 多语言，本地部署 |
 | RAG 框架 | LlamaIndex | 模块化 + 生态 |
