@@ -1,0 +1,36 @@
+# Core Framework
+llama-index>=0.10.0
+llama-index-embeddings-huggingface>=0.1.0
+llama-index-vector-stores-qdrant>=0.1.0
+mem0ai>=0.1.0
+
+# Vector Database
+qdrant-client>=1.7.0
+
+# Chinese Embedding Model
+sentence-transformers>=2.2.0
+torch>=2.0.0
+# Model: BAAI/bge-base-zh-v1.5
+
+# LLM Providers (choose one or more)
+anthropic>=0.18.0        # Claude
+openai>=1.10.0           # GPT-4
+llama-index-llms-openai-like>=0.5.0  # OpenAI-compatible APIs (Gemini, etc.)
+# dashscope>=1.14.0      # Qwen (optional)
+
+# Graph Database
+neo4j>=5.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+tqdm>=4.65.0
+
+# Development & Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Optional: Web API
+# fastapi>=0.109.0
+# uvicorn>=0.27.0

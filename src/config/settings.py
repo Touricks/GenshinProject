@@ -1,0 +1,61 @@
+"""Configuration settings for the ingestion pipeline."""
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
+from pathlib import Path
+from typing import Optional
+
+
+class Settings(BaseSettings):
+    """Pipeline configuration settings."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",  # Ignore extra fields from .env
+    )
+
+    # Qdrant settings
+    QDRANT_HOST: str = "localhost"
+    QDRANT_PORT: int = 6333
+    QDRANT_URL: Optional[str] = None  # Alternative: full URL like http://localhost:6333
+    COLLECTION_NAME: str = "genshin_story"
+
+    # Embedding settings
+    EMBEDDING_MODEL: str = "BAAI/bge-base-zh-v1.5"
+    EMBEDDING_DIM: int = 768
+    EMBEDDING_BATCH_SIZE: int = 64
+    DEVICE: str = "auto"  # "auto", "cpu", "cuda", "mps"
+
+    # Reranker settings
+    RERANKER_MODEL: str = "jinaai/jina-reranker-v2-base-multilingual"
+    RERANKER_TOP_K: int = 5
+
+    # Chunking settings
+    MAX_CHUNK_SIZE: int = 1500
+    MIN_CHUNK_SIZE: int = 200
+    CHUNK_OVERLAP: int = 100
+
+    # Data paths
+    DATA_DIR: Path = Path("Data")
+
+    # Incremental indexing
+    VECTOR_TRACKING_FILE: Path = Path(".cache/vector/tracking.json")
+
+    @model_validator(mode="after")
+    def parse_qdrant_url(self):
+        """Parse QDRANT_URL into host and port if provided."""
+        if self.QDRANT_URL:
+            # Parse URL like http://localhost:6333
+            url = self.QDRANT_URL.replace("http://", "").replace("https://", "")
+            if ":" in url:
+                host, port = url.split(":")
+                self.QDRANT_HOST = host
+                self.QDRANT_PORT = int(port)
+            else:
+                self.QDRANT_HOST = url
+        return self
+
+
+# Global settings instance
+settings = Settings()

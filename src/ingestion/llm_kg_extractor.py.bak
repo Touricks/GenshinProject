@@ -1,0 +1,318 @@
+"""
+LLM-based Knowledge Graph Extractor.
+
+Uses LLM (via OpenAI-compatible API) to extract entities and relationships
+from dialogue text for building knowledge graphs.
+
+This module is independent of Neo4j and can be tested without a database connection.
+"""
+
+import os
+from pathlib import Path
+from typing import List, Optional, Literal, Set
+from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+
+# Load .env from src directory
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
+
+
+# =============================================================================
+# Pydantic Models for Structured Output
+# =============================================================================
+
+class ExtractedEntity(BaseModel):
+    """A single extracted entity from text."""
+    name: str = Field(description="实体名称（中文）")
+    entity_type: Literal["Character", "Organization", "Location", "Event"] = Field(
+        description="实体类型"
+    )
+    role: Optional[str] = Field(
+        default=None,
+        description="角色职业/头衔，如「医生」"
+    )
+    aliases: List[str] = Field(
+        default_factory=list,
+        description="别名列表"
+    )
+
+
+class ExtractedRelationship(BaseModel):
+    """A single extracted relationship between entities."""
+    source: str = Field(description="关系源实体名称")
+    target: str = Field(description="关系目标实体名称")
+    relation_type: Literal[
+        "FRIEND_OF",      # 朋友、友好关系
+        "ENEMY_OF",       # 敌人、对立关系
+        "PARTNER_OF",     # 伙伴、搭档、助理、龙伴
+        "FAMILY_OF",      # 亲属关系
+        "MEMBER_OF",      # 属于某组织/部族
+        "LEADER_OF",      # 组织的领导者
+        "PARTICIPATED_IN", # 参与事件
+        "LOCATED_IN",     # 位于某地
+        "INTERACTS_WITH"  # 仅有对话交互（兜底）
+    ] = Field(description="关系类型")
+    description: Optional[str] = Field(
+        default=None,
+        description="关系描述/文本证据"
+    )
+
+
+class KnowledgeGraphOutput(BaseModel):
+    """Complete knowledge graph extraction output."""
+    entities: List[ExtractedEntity] = Field(
+        default_factory=list,
+        description="所有提取的实体"
+    )
+    relationships: List[ExtractedRelationship] = Field(
+        default_factory=list,
+        description="实体间的关系"
+    )
+
+    def get_entity_names(self) -> Set[str]:
+        """Get all entity names as a set."""
+        return {e.name for e in self.entities}
+
+    def get_characters(self) -> List[ExtractedEntity]:
+        """Get only character entities."""
+        return [e for e in self.entities if e.entity_type == "Character"]
+
+    def get_organizations(self) -> List[ExtractedEntity]:
+        """Get only organization entities."""
+        return [e for e in self.entities if e.entity_type == "Organization"]
+
+    def get_locations(self) -> List[ExtractedEntity]:
+        """Get only location entities."""
+        return [e for e in self.entities if e.entity_type == "Location"]
+
+
+# =============================================================================
+# Extraction Prompt
+# =============================================================================
+
+EXTRACTION_PROMPT = """你是一个原神（Genshin Impact）剧情文本分析专家，特别精通纳塔（Natlan）地区的设定。请从以下对话文本中提取知识图谱（实体+关系）。
+
+## 纳塔地区背景知识（辅助实体/关系判断）
+- **六大部族**：
+  1. **花羽会** (Flower-Feather Clan) - 擅长弓术与飞行，与「绒翼龙」共存。代表人物：恰斯卡（调停人）、伊法（曾属）。
+  2. **流泉之众** (People of the Springs) - 擅长水疗、温泉、水上运动，与「芬鳍龙」共存。代表人物：玛拉妮。
+  3. **悬木人** (Scions of the Canopy) - 擅长极限运动、送信，与「匿叶龙」共存。代表人物：基尼奇。
+  4. **回声之子** (Children of Echoes) - 擅长采矿、锻造、舞蹈，与「嵴锋龙」共存。代表人物：希诺宁、卡齐娜。
+  5. **烟谜主** (Masters of the Night-Wind) - 神秘的萨满部族，与灵界沟通，与「冥玛」共存。代表人物：茜特菈莉。
+  6. **沃土之邦** (Collective of Plenty) - 强壮的战士部族。代表人物：伊安珊。
+- **重要概念**：古名（Ancient Name）、夜神之国、还魂诗、归火圣夜巡礼。
+- **特殊关系**：纳塔人通常拥有名为「龙伙伴」的爬虫类生物（属 **PARTNER_OF**）。
+
+## 实体提取规则
+1. **角色(Character)**：
+   - 提取所有对话参与者及提到的重要人物。
+   - **旅行者**别名映射：杜麦尼、玩家、Traveler、金发异乡人。
+   - **派蒙**别名映射：飞行的小精灵、应急食品。
+   - 提取 Role 字段：如 "火神"、"大萨满"、"医生"、"队长" 等。
+   
+2. **组织(Organization)**：
+   - 上述六大部族。
+   - 愚人众（Fatui）、深渊（Abyss）。
+   - 冒险家协会。
+
+3. **地点(Location)**：
+   - 纳塔、圣火竞技场、楚姆、甚至部族名称有时也可作为地点（视语境）。
+
+## 关系提取规则 (relation_type)
+请深入理解语境，**不要**仅仅提取 INTERACTS_WITH。
+- **MEMBER_OF**: 某人属于某部族/组织。
+  - 例："我是流泉之众的向导" -> MEMBER_OF(流泉之众)
+- **LEADER_OF**: 明确的领导关系。
+  - 例："火神玛薇卡" -> LEADER_OF(纳塔)
+  - 例："首领"、"族长" -> LEADER_OF(对应部族)
+- **PARTNER_OF**: 搭档、长期合作、龙伙伴、主仆/助理。
+  - 例："基尼奇和阿尤" -> PARTNER_OF (description="龙伙伴")
+  - 例："伊法和咔库库" -> PARTNER_OF (description="助理")
+  - 例："旅行者和派蒙" -> PARTNER_OF (description="向导")
+- **FRIEND_OF**: 朋友、友好的熟人。
+- **FAMILY_OF**: 父母、兄弟姐妹、祖孙。
+  - 例："黑曜石奶奶"可能是昵称，需根据语境判断是否真有亲属关系，若只是尊敬称呼则为 KNOWS/FRIEND。
+- **ENEMY_OF**: 战斗对手、敌对阵营。
+- **INTERACTS_WITH**: 仅当无法归类为以上强关系时，用于记录对话发生。
+
+## 对话文本
+{text}
+
+请输出严格的JSON格式。
+"""
+
+
+# =============================================================================
+# LLM Knowledge Graph Extractor
+# =============================================================================
+
+class LLMKnowledgeGraphExtractor:
+    """
+    Extract complete knowledge graph using LLM.
+
+    This class is independent of Neo4j and produces Pydantic objects
+    that can be serialized to JSON for caching or testing.
+    """
+
+    def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
+        """
+        Initialize the LLM extractor.
+
+        Args:
+            model: Model name (defaults to GEMINI_MODEL env var)
+            api_key: API key (defaults to GEMINI_API_KEY env var)
+        """
+        from llama_index.llms.openai_like import OpenAILike
+
+        self.model = model or os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        api_base = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+        api_key = api_key or os.getenv("GEMINI_API_KEY")
+
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable is required")
+
+        self.llm = OpenAILike(
+            model=self.model,
+            api_base=api_base,
+            api_key=api_key,
+            is_chat_model=True,
+            context_window=32000,
+        )
+        self.structured_llm = self.llm.as_structured_llm(KnowledgeGraphOutput)
+
+    def _build_prompt(self, text: str) -> str:
+        """Build the extraction prompt with the input text."""
+        return EXTRACTION_PROMPT.format(text=text)
+
+    def extract(self, text: str) -> KnowledgeGraphOutput:
+        """
+        Extract entities and relationships from text.
+
+        Args:
+            text: Dialogue text to extract from
+
+        Returns:
+            KnowledgeGraphOutput containing entities and relationships
+        """
+        prompt = self._build_prompt(text)
+        response = self.structured_llm.complete(prompt)
+        return response.raw
+
+    def extract_entities_only(self, text: str) -> List[ExtractedEntity]:
+        """
+        Extract only entities (for compatibility with existing code).
+
+        Args:
+            text: Dialogue text to extract from
+
+        Returns:
+            List of extracted entities
+        """
+        result = self.extract(text)
+        return result.entities
+
+    def extract_relationships_only(self, text: str) -> List[ExtractedRelationship]:
+        """
+        Extract only relationships (for compatibility with existing code).
+
+        Args:
+            text: Dialogue text to extract from
+
+        Returns:
+            List of extracted relationships
+        """
+        result = self.extract(text)
+        return result.relationships
+
+    def extract_character_names(self, text: str) -> Set[str]:
+        """
+        Extract character names only (for compatibility with EntityExtractor).
+
+        Args:
+            text: Dialogue text to extract from
+
+        Returns:
+            Set of character names
+        """
+        result = self.extract(text)
+        return {e.name for e in result.entities if e.entity_type == "Character"}
+
+
+# =============================================================================
+# Convenience Functions
+# =============================================================================
+
+def extract_kg_from_text(text: str) -> KnowledgeGraphOutput:
+    """
+    Convenience function to extract KG from text.
+
+    Args:
+        text: Dialogue text
+
+    Returns:
+        KnowledgeGraphOutput
+    """
+    extractor = LLMKnowledgeGraphExtractor()
+    return extractor.extract(text)
+
+
+def extract_kg_from_file(file_path: Path) -> KnowledgeGraphOutput:
+    """
+    Extract KG from a dialogue file.
+
+    Args:
+        file_path: Path to dialogue file
+
+    Returns:
+        KnowledgeGraphOutput
+    """
+    text = file_path.read_text(encoding="utf-8")
+    return extract_kg_from_text(text)
+
+
+# =============================================================================
+# CLI for testing
+# =============================================================================
+
+if __name__ == "__main__":
+    import sys
+
+    # Test with a sample text
+    test_text = """
+恰斯卡：这位是我们部族的「医生」伊法…和他的助理咔库库。
+
+伊法：…伤口已经处理完了。
+
+派蒙：——嘿！恰斯卡！
+
+恰斯卡：嗯，派蒙？还有我们的「杜麦尼」？
+"""
+
+    print("Testing LLM Knowledge Graph Extractor...")
+    print("=" * 60)
+    print("Input text:")
+    print(test_text)
+    print("=" * 60)
+
+    try:
+        extractor = LLMKnowledgeGraphExtractor()
+        result = extractor.extract(test_text)
+
+        print("\nExtracted Entities:")
+        for entity in result.entities:
+            role_str = f" (role={entity.role})" if entity.role else ""
+            aliases_str = f" aliases={entity.aliases}" if entity.aliases else ""
+            print(f"  - {entity.name} [{entity.entity_type}]{role_str}{aliases_str}")
+
+        print("\nExtracted Relationships:")
+        for rel in result.relationships:
+            desc_str = f" ({rel.description})" if rel.description else ""
+            print(f"  - {rel.source} --[{rel.relation_type}]--> {rel.target}{desc_str}")
+
+        print("\nJSON Output:")
+        print(result.model_dump_json(indent=2))
+
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
