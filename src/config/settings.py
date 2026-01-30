@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     RERANKER_MODEL: str = "jinaai/jina-reranker-v2-base-multilingual"
     RERANKER_TOP_K: int = 5
 
+    # LLM settings (for Agent)
+    # 支持两种命名: LLM_MODEL 或 GEMINI_MODEL
+    LLM_MODEL: Optional[str] = None
+    GEMINI_MODEL: Optional[str] = None
+    GOOGLE_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+
     # Chunking settings
     MAX_CHUNK_SIZE: int = 1500
     MIN_CHUNK_SIZE: int = 200
@@ -43,10 +50,10 @@ class Settings(BaseSettings):
     VECTOR_TRACKING_FILE: Path = Path(".cache/vector/tracking.json")
 
     @model_validator(mode="after")
-    def parse_qdrant_url(self):
-        """Parse QDRANT_URL into host and port if provided."""
+    def resolve_settings(self):
+        """Resolve settings with fallbacks and aliases."""
+        # Parse QDRANT_URL into host and port if provided
         if self.QDRANT_URL:
-            # Parse URL like http://localhost:6333
             url = self.QDRANT_URL.replace("http://", "").replace("https://", "")
             if ":" in url:
                 host, port = url.split(":")
@@ -54,6 +61,15 @@ class Settings(BaseSettings):
                 self.QDRANT_PORT = int(port)
             else:
                 self.QDRANT_HOST = url
+
+        # Resolve LLM_MODEL: prefer LLM_MODEL, fallback to GEMINI_MODEL
+        if not self.LLM_MODEL:
+            self.LLM_MODEL = self.GEMINI_MODEL or "gemini-2.5-flash"
+
+        # Resolve GOOGLE_API_KEY: prefer GOOGLE_API_KEY, fallback to GEMINI_API_KEY
+        if not self.GOOGLE_API_KEY:
+            self.GOOGLE_API_KEY = self.GEMINI_API_KEY
+
         return self
 
 

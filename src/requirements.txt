@@ -15,7 +15,9 @@ torch>=2.0.0
 # LLM Providers (choose one or more)
 anthropic>=0.18.0        # Claude
 openai>=1.10.0           # GPT-4
-llama-index-llms-openai-like>=0.5.0  # OpenAI-compatible APIs (Gemini, etc.)
+llama-index-llms-openai-like>=0.5.0  # OpenAI-compatible APIs
+llama-index-llms-google-genai>=0.4.0  # Google Gemini (primary)
+google-genai>=1.0.0      # Required by google-genai LLM
 # dashscope>=1.14.0      # Qwen (optional)
 
 # Graph Database
