@@ -1,0 +1,284 @@
+{
+  "version": "2.0",
+  "description": "实体消解测试集 - 基于约束的评估方式",
+  "created_at": "2026-01-29",
+  "philosophy": "实体消解的正确性可以通过不变量验证：同一实体不应重复，别名应指向同一实体",
+  "test_types": {
+    "must_unify": "这些提及必须解析为同一实体",
+    "must_not_unify": "这些提及必须解析为不同实体",
+    "should_unify": "这些提及应该解析为同一实体（非强制）",
+    "canonical_hint": "建议的规范名（非强制）"
+  },
+  "items": [
+    {
+      "id": "resolve_001",
+      "category": "alias_unification",
+      "difficulty": "easy",
+      "description": "玩家角色多别名统一",
+      "input": {
+        "mentions": ["杜麦尼", "Traveler", "旅行者", "玩家"],
+        "context_texts": [
+          "恰斯卡：还有我们的「杜麦尼」？",
+          "？？？：…Traveler…派蒙…",
+          "玩家：伊法刚才是在「看病」吗？"
+        ]
+      },
+      "constraints": {
+        "must_unify": ["杜麦尼", "Traveler", "旅行者", "玩家"],
+        "canonical_hint": "旅行者",
+        "result_entity_count": 1,
+        "notes": "所有这些提及都指向同一个玩家角色"
+      }
+    },
+    {
+      "id": "resolve_002",
+      "category": "alias_unification",
+      "difficulty": "medium",
+      "description": "伊涅芙身份统一",
+      "input": {
+        "mentions": ["？？？", "伊涅芙", "机关人偶", "信使", "女仆机器人"],
+        "context_texts": [
+          "？？？：…回…家…",
+          "爱莱妲：啊——伊涅芙姐姐！",
+          "恰斯卡：机关…拼成的人偶？",
+          "恰斯卡：可能性很高…那么她就是你的「信使」？"
+        ]
+      },
+      "constraints": {
+        "must_unify": ["伊涅芙"],
+        "should_unify": ["？？？", "机关人偶", "信使", "女仆机器人"],
+        "canonical_hint": "伊涅芙",
+        "notes": "？？？在身份揭示后应与伊涅芙统一，描述性称呼可选"
+      }
+    },
+    {
+      "id": "resolve_003",
+      "category": "alias_unification",
+      "difficulty": "medium",
+      "description": "派蒙描述性称呼",
+      "input": {
+        "mentions": ["派蒙", "白色飞行物", "飞行高手"],
+        "context_texts": [
+          "？？？：白色…飞行物…金发旅行者…",
+          "派蒙：——嘿！恰斯卡！"
+        ]
+      },
+      "constraints": {
+        "must_unify": ["派蒙"],
+        "should_unify": ["白色飞行物", "飞行高手"],
+        "canonical_hint": "派蒙",
+        "notes": "描述性称呼的统一是可选的高级功能"
+      }
+    },
+    {
+      "id": "resolve_004",
+      "category": "alias_unification",
+      "difficulty": "easy",
+      "description": "咔库库别名",
+      "input": {
+        "mentions": ["咔库库", "学舌怪怪龙"],
+        "context_texts": [
+          "咔库库：幸会啊，哥们！",
+          "派蒙：——学舌怪怪龙！"
+        ]
+      },
+      "constraints": {
+        "must_unify": ["咔库库", "学舌怪怪龙"],
+        "canonical_hint": "咔库库"
+      }
+    },
+    {
+      "id": "resolve_005",
+      "category": "alias_unification",
+      "difficulty": "medium",
+      "description": "茜特菈莉别名",
+      "input": {
+        "mentions": ["茜特菈莉", "黑曜石奶奶"],
+        "context_texts": [
+          "派蒙：呜哇…听着像「黑曜石奶奶」在吓小孩的故事里会做的事…",
+          "玩家：茜特菈莉才不会收学徒…"
+        ]
+      },
+      "constraints": {
+        "should_unify": ["茜特菈莉", "黑曜石奶奶"],
+        "canonical_hint": "茜特菈莉",
+        "notes": "需要领域知识才能建立关联"
+      }
+    },
+    {
+      "id": "resolve_006",
+      "category": "disambiguation",
+      "difficulty": "hard",
+      "description": "？？？多角色区分",
+      "input": {
+        "mentions": [
+          {"text": "？？？", "scene": "闪回场景", "line": "？？？：稍早之前…"},
+          {"text": "？？？", "scene": "时间标记", "line": "？？？：转眼数天过去…"}
+        ]
+      },
+      "constraints": {
+        "must_not_unify": [
+          {"mention1": {"scene": "闪回场景"}, "mention2": {"scene": "时间标记"}}
+        ],
+        "notes": "同一标记符在不同语境下可能指代不同实体，需要根据上下文区分"
+      }
+    },
+    {
+      "id": "resolve_007",
+      "category": "deduplication",
+      "difficulty": "easy",
+      "description": "同一角色多次出现",
+      "input": {
+        "character": "派蒙",
+        "occurrences": [
+          {"scene": "与恰斯卡对话", "line": 18},
+          {"scene": "查看情况", "line": 106},
+          {"scene": "前往希诺宁的工坊", "line": 176}
+        ]
+      },
+      "constraints": {
+        "must_unify_all_occurrences": true,
+        "result_entity_count": 1,
+        "notes": "同一章节中同名角色的多次出现必须合并"
+      }
+    },
+    {
+      "id": "resolve_008",
+      "category": "deduplication",
+      "difficulty": "medium",
+      "description": "组织实体去重",
+      "input": {
+        "mentions": ["花羽会", "「花羽会」", "我们部族"],
+        "context_texts": [
+          "恰斯卡：——要不就先留在「花羽会」里？",
+          "恰斯卡：这位是我们部族的「医生」伊法"
+        ]
+      },
+      "constraints": {
+        "must_unify": ["花羽会", "「花羽会」"],
+        "should_unify": ["我们部族"],
+        "canonical_hint": "花羽会",
+        "notes": "带书名号和不带的应统一；'我们部族'需要推断"
+      }
+    },
+    {
+      "id": "resolve_009",
+      "category": "cross_reference",
+      "difficulty": "hard",
+      "description": "古名传承 - 祝福",
+      "input": {
+        "title": "祝福",
+        "mentions": [
+          {"holder": "伊葵", "context": "「祝福」的伊葵"},
+          {"holder": "希诺宁", "context": "「祝福」也是希诺宁的"}
+        ]
+      },
+      "constraints": {
+        "must_not_unify": ["伊葵", "希诺宁"],
+        "should_link_via": "祝福",
+        "notes": "同一古名的不同持有者不应合并，但应通过古名关联"
+      }
+    },
+    {
+      "id": "resolve_010",
+      "category": "cross_reference",
+      "difficulty": "hard",
+      "description": "古名传承 - 超越",
+      "input": {
+        "title": "超越",
+        "mentions": [
+          {"holder": "莉安歌", "context": "为我留下「超越」古名的英杰"},
+          {"holder": "恰斯卡", "context": "implied current holder"}
+        ]
+      },
+      "constraints": {
+        "must_not_unify": ["莉安歌", "恰斯卡"],
+        "should_link_via": "超越",
+        "notes": "历史持有者和当前持有者是不同实体"
+      }
+    },
+    {
+      "id": "resolve_011",
+      "category": "location_hierarchy",
+      "difficulty": "medium",
+      "description": "地点层级关系",
+      "input": {
+        "mentions": ["挪德卡莱", "那夏镇"],
+        "context_texts": [
+          "阿西木：在挪德卡莱的「那夏镇」"
+        ]
+      },
+      "constraints": {
+        "must_not_unify": ["挪德卡莱", "那夏镇"],
+        "should_have_hierarchy": {"parent": "挪德卡莱", "child": "那夏镇"},
+        "notes": "子地点不是别名，应保持独立但建立层级关系"
+      }
+    },
+    {
+      "id": "resolve_012",
+      "category": "deduplication",
+      "difficulty": "easy",
+      "description": "商队成员独立性",
+      "input": {
+        "characters": ["卓新", "艾慕", "爱莱妲", "阿西木", "埃德恩"]
+      },
+      "constraints": {
+        "must_not_unify_any": true,
+        "result_entity_count": 5,
+        "notes": "这些是不同的独立角色，不应被合并"
+      }
+    },
+    {
+      "id": "resolve_013",
+      "category": "incremental",
+      "difficulty": "medium",
+      "description": "增量去重 - 已有角色",
+      "input": {
+        "existing_entities": ["恰斯卡", "派蒙", "伊法"],
+        "new_text": "恰斯卡：希诺宁——哦？\n\n派蒙：呜哇…好乱…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_link_to_existing": ["恰斯卡", "派蒙"],
+        "must_not_create_duplicate": true,
+        "should_add_new": ["希诺宁"],
+        "notes": "增量时遇到已有实体应链接而非新建"
+      }
+    },
+    {
+      "id": "resolve_014",
+      "category": "incremental",
+      "difficulty": "hard",
+      "description": "增量去重 - 别名遇到正名",
+      "input": {
+        "existing_entities": [
+          {"name": "？？？", "provisional": true}
+        ],
+        "new_text": "爱莱妲：啊——伊涅芙姐姐！\n\n？？？：…伊涅芙…？",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_resolve_provisional": {"from": "？？？", "to": "伊涅芙"},
+        "result_entity_count": 1,
+        "notes": "当正式名称出现时，应更新临时占位符"
+      }
+    },
+    {
+      "id": "resolve_015",
+      "category": "constraint",
+      "difficulty": "medium",
+      "description": "全章去重约束",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "full_chapter": true
+      },
+      "constraints": {
+        "no_duplicate_characters": true,
+        "no_duplicate_organizations": true,
+        "max_anonymous_entities": 3,
+        "all_aliases_resolved": false,
+        "notes": "允许部分别名未解析，但不允许明显重复"
+      }
+    }
+  ]
+}

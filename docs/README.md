@@ -11,6 +11,7 @@
 | 架构决策 | [adr/](./adr/) | Architecture Decision Records |
 | 项目管理 | [project/](./project/) | Implementation Plans |
 | 测试文档 | [testing/](./testing/) | Evaluation & Testing |
+| 查询 API | [query/](./query/) | Vector Search API Reference |
 
 ---
 
@@ -24,7 +25,7 @@ docs/
 ├── design/                            # 设计文档 (Design Docs)
 │   ├── README.md                      # 设计概览
 │   ├── system-architecture.md         # 系统架构 & 技术选型
-│   ├── data-pipeline.md               # 数据处理流水线设计
+│   ├── ingestion.md                   # 数据处理流水线设计
 │   └── data-model.md                  # 数据模型 (Neo4j Schema)
 │
 ├── adr/                               # 架构决策记录 (ADRs)
@@ -33,6 +34,10 @@ docs/
 │
 ├── project/                           # 项目管理
 │   └── implementation-plan.md         # 实施计划 & 任务分解
+│
+├── query/                             # 查询 API 文档
+│   ├── README.md                      # API 概览
+│   └── vector-search-api.md           # Vector Search API Reference
 │
 └── testing/                           # 测试文档
     └── evaluation-dataset.md          # 评估数据集设计

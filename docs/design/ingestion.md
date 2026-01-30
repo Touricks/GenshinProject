@@ -468,7 +468,76 @@ assert "恰斯卡" in results[0].payload.get("characters", [])
 
 ---
 
-## 附录 A: 文件头解析正则
+## 8. Qdrant Storage Reference (English)
+
+### 8.1 Collection Configuration
+
+| Property | Value |
+|----------|-------|
+| Collection Name | `genshin_story` |
+| Vector Dimension | **768** (BGE-base-zh-v1.5) |
+| Distance Metric | **Cosine** |
+
+### 8.2 Point Structure
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Point                                                       │
+├─────────────────────────────────────────────────────────────┤
+│  id: int64 (hash of chunk.id)                               │
+│  vector: float[768] (BGE Chinese embedding)                 │
+│  payload: {                                                  │
+│    text: str           # Original dialogue text              │
+│    task_id: str        # Task ID (e.g., "1600")             │
+│    task_name: str      # Task name (e.g., "归途")           │
+│    chapter_number: int # Chapter number                      │
+│    chapter_title: str  # Chapter title (e.g., "墟火")       │
+│    series_name: str    # Series name (e.g., "空月之歌")     │
+│    scene_title: str    # Scene title                         │
+│    scene_order: int    # Scene order within chapter          │
+│    chunk_order: int    # Chunk order within scene            │
+│    event_order: int    # Global temporal order               │
+│    characters: [str]   # Characters in this chunk            │
+│    has_choice: bool    # Whether contains choice options     │
+│    source_file: str    # Source file path                    │
+│  }                                                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 8.3 Payload Indexes
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `task_id` | KEYWORD | Filter by quest/task |
+| `chapter_number` | INTEGER | Filter by chapter |
+| `characters` | KEYWORD | Filter by character names |
+| `event_order` | INTEGER | Temporal range queries |
+| `series_name` | KEYWORD | Filter by story series |
+
+### 8.4 Query Capabilities
+
+1. **Vector Similarity Search**: Find semantically related dialogue chunks
+2. **Filtered Search**: Filter by task_id, characters, chapter_number, etc.
+3. **Combined Queries**: Vector similarity + metadata filtering
+
+### 8.5 Data Flow
+
+```
+Data/{task_id}/chapter{N}_dialogue.txt
+    ↓ DocumentLoader
+RawDocument (task_name, chapter, series)
+    ↓ SceneChunker (scene-based splitting)
+    ↓ MetadataEnricher (character extraction)
+Chunk (text + metadata)
+    ↓ EmbeddingGenerator (BGE-base-zh-v1.5)
+Chunk (text + metadata + embedding[768])
+    ↓ VectorIndexer
+Qdrant Point (id, vector, payload)
+```
+
+---
+
+## Appendix A: 文件头解析正则
 
 ```python
 HEADER_PATTERNS = {

@@ -1,0 +1,594 @@
+{
+  "version": "1.0",
+  "description": "元数据提取测试集 - 验证角色提取、事件顺序、章节信息解析准确性",
+  "created_at": "2026-01-29",
+  "target_metrics": {
+    "character_f1": 0.90,
+    "event_order_accuracy": 0.85,
+    "task_info_accuracy": 0.95,
+    "choice_detection_accuracy": 0.95
+  },
+  "items": [
+    {
+      "id": "meta_001",
+      "category": "character_extraction",
+      "difficulty": "easy",
+      "description": "标准对话格式角色提取",
+      "input": {
+        "chunk_text": "伊法：…伤口已经处理完了。所以你是在哪发现的它？怎么会伤成这样？\n\n恰斯卡：就在附近的海滩上，还是那些家伙干的…\n\n派蒙：——嘿！恰斯卡，你们围在这做什么呢？",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["伊法", "恰斯卡", "派蒙"]
+      }
+    },
+    {
+      "id": "meta_002",
+      "category": "character_extraction",
+      "difficulty": "medium",
+      "description": "匿名角色（？？？）识别",
+      "input": {
+        "chunk_text": "？？？：稍早之前…\n\n？？？：……\n\n？？？：…在哪里…\n\n？？？：…要…找到…他们…\n\n小机器人：滴…滴…嘟…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["？？？", "小机器人"],
+        "notes": "？？？作为单一匿名角色处理"
+      }
+    },
+    {
+      "id": "meta_003",
+      "category": "character_extraction",
+      "difficulty": "easy",
+      "description": "玩家角色识别",
+      "input": {
+        "chunk_text": "玩家：伊法刚才是在「看病」吗？\n\n伊法：嗯，好在恰斯卡送医及时，现在已经没大碍了。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["玩家", "伊法"]
+      }
+    },
+    {
+      "id": "meta_004",
+      "category": "character_extraction",
+      "difficulty": "medium",
+      "description": "非人类角色识别",
+      "input": {
+        "chunk_text": "受伤的绒翼龙：啁——\n\n恰斯卡：她是被「秘源机兵」给袭击了。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["受伤的绒翼龙", "恰斯卡"],
+        "non_human_speakers": ["受伤的绒翼龙"]
+      }
+    },
+    {
+      "id": "meta_005",
+      "category": "character_extraction",
+      "difficulty": "hard",
+      "description": "特殊实体（诅咒）识别",
+      "input": {
+        "chunk_text": "黑雾诅咒：——「悖谬」。\n\n黑雾诅咒：此非正途。此非归处。\n\n？？？：唔…！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["黑雾诅咒", "？？？"],
+        "special_entities": ["黑雾诅咒"]
+      }
+    },
+    {
+      "id": "meta_006",
+      "category": "task_info",
+      "difficulty": "easy",
+      "description": "章节头部信息解析",
+      "input": {
+        "header_text": "# 归途 - 第0章：墟火\n# 空月之歌 序奏\n# 来源：https://gi.yatta.moe/chs/archive/quest/1602/the-journey-home?chapter=0",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "task_id": "1600",
+        "task_name": "归途",
+        "chapter_number": 0,
+        "chapter_name": "墟火",
+        "series_name": "空月之歌 序奏",
+        "source_url": "https://gi.yatta.moe/chs/archive/quest/1602/the-journey-home?chapter=0"
+      }
+    },
+    {
+      "id": "meta_007",
+      "category": "task_info",
+      "difficulty": "medium",
+      "description": "不同章节编号格式",
+      "input": {
+        "header_text": "# 归途 - 第1章：白夜降临\n# 空月之歌 第一幕",
+        "source_file": "Data/1600/chapter1_dialogue.txt"
+      },
+      "expected_metadata": {
+        "task_id": "1600",
+        "task_name": "归途",
+        "chapter_number": 1,
+        "chapter_name": "白夜降临",
+        "series_name": "空月之歌 第一幕"
+      }
+    },
+    {
+      "id": "meta_008",
+      "category": "event_order",
+      "difficulty": "easy",
+      "description": "基础事件顺序计算",
+      "input": {
+        "chapter_number": 0,
+        "scene_order": 1,
+        "chunk_order": 0
+      },
+      "expected_metadata": {
+        "event_order": 10,
+        "formula": "chapter*1000 + scene*10 + chunk"
+      }
+    },
+    {
+      "id": "meta_009",
+      "category": "event_order",
+      "difficulty": "medium",
+      "description": "跨场景事件顺序",
+      "input": {
+        "chapter_number": 0,
+        "scene_order": 5,
+        "chunk_order": 2
+      },
+      "expected_metadata": {
+        "event_order": 52,
+        "formula": "chapter*1000 + scene*10 + chunk"
+      }
+    },
+    {
+      "id": "meta_010",
+      "category": "choice_detection",
+      "difficulty": "easy",
+      "description": "标准双选项检测",
+      "input": {
+        "chunk_text": "## 选项\n- 想再多陪陪朋友。\n- 想打发一下时间。\n\n玩家：想再多陪陪朋友。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "has_choice": true,
+        "choice_count": 2,
+        "choice_options": ["想再多陪陪朋友。", "想打发一下时间。"],
+        "selected_option": "想再多陪陪朋友。"
+      }
+    },
+    {
+      "id": "meta_011",
+      "category": "choice_detection",
+      "difficulty": "medium",
+      "description": "三选项检测",
+      "input": {
+        "chunk_text": "## 选项\n- 蓝色的书籍\n- 红色的书籍\n- 绿色的书籍\n\n玩家：蓝色的书籍",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "has_choice": true,
+        "choice_count": 3,
+        "choice_options": ["蓝色的书籍", "红色的书籍", "绿色的书籍"],
+        "selected_option": "蓝色的书籍"
+      }
+    },
+    {
+      "id": "meta_012",
+      "category": "choice_detection",
+      "difficulty": "easy",
+      "description": "无选项场景",
+      "input": {
+        "chunk_text": "恰斯卡：这位是我们部族的「医生」伊法…和他的助理咔库库。\n\n伊法：没准是因为我们都是大忙人？",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "has_choice": false
+      }
+    },
+    {
+      "id": "meta_013",
+      "category": "character_extraction",
+      "difficulty": "medium",
+      "description": "学舌龙对话角色",
+      "input": {
+        "chunk_text": "咔库库：幸会啊，哥们！\n\n派蒙：——学舌怪怪龙！\n\n咔库库：——不会吧！哥们！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["咔库库", "派蒙"],
+        "character_traits": {"咔库库": "echo_speaker"}
+      }
+    },
+    {
+      "id": "meta_014",
+      "category": "character_extraction",
+      "difficulty": "hard",
+      "description": "角色引用（非说话者）",
+      "input": {
+        "chunk_text": "恰斯卡：希诺宁——哦？这个时间点，难得见你没在睡午觉。\n\n希诺宁：嘁，才走一个玛薇卡，又来一个恰斯卡…你是专程来挖苦我的吗？",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["恰斯卡", "希诺宁"],
+        "mentioned_characters": ["玛薇卡"],
+        "notes": "玛薇卡被提及但未直接说话"
+      }
+    },
+    {
+      "id": "meta_015",
+      "category": "scene_name",
+      "difficulty": "easy",
+      "description": "场景名称提取",
+      "input": {
+        "chunk_text": "## 与恰斯卡对话\n\n伊法：…伤口已经处理完了。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "scene_name": "与恰斯卡对话"
+      }
+    },
+    {
+      "id": "meta_016",
+      "category": "scene_name",
+      "difficulty": "medium",
+      "description": "任务指示类场景名",
+      "input": {
+        "chunk_text": "## 击败秘源机兵\n\n## 查看情况",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "scene_names": ["击败秘源机兵", "查看情况"],
+        "scene_type": "task_instruction"
+      }
+    },
+    {
+      "id": "meta_017",
+      "category": "character_extraction",
+      "difficulty": "medium",
+      "description": "多角色长对话",
+      "input": {
+        "chunk_text": "卓新：抱歉…忘了自我介绍——我叫卓新，是一名商人\n\n派蒙：挪德卡莱！？\n\n恰斯卡：但看你们的装束，倒不像是一路人？\n\n阿西木：岂止是摩擦！\n\n埃德恩：「月亮」…还有那些「月神像」的事…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["卓新", "派蒙", "恰斯卡", "阿西木", "埃德恩"]
+      }
+    },
+    {
+      "id": "meta_018",
+      "category": "character_extraction",
+      "difficulty": "hard",
+      "description": "角色名揭示场景",
+      "input": {
+        "chunk_text": "爱莱妲：啊——伊涅芙姐姐！\n\n？？？：…伊涅芙…？\n\n艾慕：伊涅芙！总算找到你了…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["爱莱妲", "？？？", "艾慕"],
+        "identity_reveal": {"？？？": "伊涅芙"}
+      }
+    },
+    {
+      "id": "meta_019",
+      "category": "event_order",
+      "difficulty": "hard",
+      "description": "时间跳跃处理",
+      "input": {
+        "chunk_text": "？？？：转眼数天过去…",
+        "previous_event_order": 150
+      },
+      "expected_metadata": {
+        "is_time_skip": true,
+        "temporal_marker": "数天",
+        "notes": "时间跳跃后event_order应重置或标记"
+      }
+    },
+    {
+      "id": "meta_020",
+      "category": "character_extraction",
+      "difficulty": "medium",
+      "description": "带称号的角色",
+      "input": {
+        "chunk_text": "希诺宁：那可不是我亲戚…她是回声之子的先祖，纳塔最初的「六英杰」之一，「祝福」的伊葵。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["希诺宁"],
+        "mentioned_characters": ["伊葵"],
+        "character_titles": {"伊葵": "祝福"}
+      }
+    },
+    {
+      "id": "meta_021",
+      "category": "character_extraction",
+      "difficulty": "hard",
+      "description": "历史人物提及",
+      "input": {
+        "chunk_text": "恰斯卡：就连他曾经的盟友伊葵…也在其列。最后伊葵以自己的死亡，为旧日的情义画下了句号…\n\n恰斯卡：——莉安歌。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["恰斯卡"],
+        "mentioned_characters": ["伊葵", "莉安歌", "奥奇坎"],
+        "historical_figures": true
+      }
+    },
+    {
+      "id": "meta_022",
+      "category": "character_extraction",
+      "difficulty": "medium",
+      "description": "带括号的角色名",
+      "input": {
+        "chunk_text": "「木偶」：…纳塔的古龙文明？呵…\n\n「木偶」：想去折腾就随你们吧\n\n维李米尔：…撤吧。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["「木偶」", "维李米尔"],
+        "quoted_names": ["「木偶」"]
+      }
+    },
+    {
+      "id": "meta_023",
+      "category": "task_info",
+      "difficulty": "hard",
+      "description": "须弥系列任务信息",
+      "input": {
+        "header_text": "# 彼时少年少女的心意 - 第0章\n# 兰那罗系列",
+        "source_file": "Data/1500/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "task_id": "1500",
+        "task_name": "彼时少年少女的心意",
+        "chapter_number": 0,
+        "series_name": "兰那罗系列"
+      }
+    },
+    {
+      "id": "meta_024",
+      "category": "choice_detection",
+      "difficulty": "hard",
+      "description": "延续性选项（省略号）",
+      "input": {
+        "chunk_text": "## 选项\n- 看来不先救醒她…\n- 什么事都弄不清楚。\n\n玩家：看来不先救醒她…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "has_choice": true,
+        "choice_type": "continuation",
+        "choice_options": ["看来不先救醒她…", "什么事都弄不清楚。"]
+      }
+    },
+    {
+      "id": "meta_025",
+      "category": "character_extraction",
+      "difficulty": "easy",
+      "description": "基尼奇和阿乔",
+      "input": {
+        "chunk_text": "阿乔：哇——什么声音那么大！是打雷了吗？\n\n基尼奇：…真打雷的话，我会先把你往天上扔。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["阿乔", "基尼奇"]
+      }
+    },
+    {
+      "id": "meta_026",
+      "category": "character_extraction",
+      "difficulty": "medium",
+      "description": "内心独白识别",
+      "input": {
+        "chunk_text": "阿乔：（是我的记忆出问题了吗…那个家伙…难道说…）\n\n阿乔：（哼，管她呢，跟我才没有关系呢。）",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["阿乔"],
+        "has_inner_monologue": true,
+        "monologue_character": "阿乔"
+      }
+    },
+    {
+      "id": "meta_027",
+      "category": "scene_name",
+      "difficulty": "easy",
+      "description": "剧情简介场景",
+      "input": {
+        "chunk_text": "## 剧情简介\n纳塔似乎迎来了一些意料之外的客人…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "scene_name": "剧情简介",
+        "is_synopsis": true,
+        "synopsis_text": "纳塔似乎迎来了一些意料之外的客人…"
+      }
+    },
+    {
+      "id": "meta_028",
+      "category": "character_extraction",
+      "difficulty": "medium",
+      "description": "商队成员角色",
+      "input": {
+        "chunk_text": "爱莱妲：伊涅芙姐姐为了保护我们，一个人跳下了船…\n\n艾慕：各位！虽然我们才到纳塔不久…\n\n卓新：你的情况…呃…有点不同。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["爱莱妲", "艾慕", "卓新"],
+        "character_group": "商队"
+      }
+    },
+    {
+      "id": "meta_029",
+      "category": "event_order",
+      "difficulty": "medium",
+      "description": "回忆片段事件顺序",
+      "input": {
+        "chunk_text": "爱诺：…从今天起你就叫「伊涅芙」啦！\n\n爱诺：——一定、一定要记得回来！",
+        "is_flashback": true,
+        "current_event_order": 100
+      },
+      "expected_metadata": {
+        "is_flashback": true,
+        "narrative_layer": "memory",
+        "notes": "回忆片段的event_order需要特殊处理"
+      }
+    },
+    {
+      "id": "meta_030",
+      "category": "character_extraction",
+      "difficulty": "hard",
+      "description": "别名使用场景",
+      "input": {
+        "chunk_text": "恰斯卡：嗯，派蒙？还有我们的「杜麦尼」？\n\n伊法：「杜麦尼」？派蒙？好久不见。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["恰斯卡", "伊法"],
+        "alias_usage": {"杜麦尼": "旅行者"},
+        "addressed_characters": ["派蒙", "杜麦尼"]
+      }
+    },
+    {
+      "id": "meta_031",
+      "category": "scene_name",
+      "difficulty": "medium",
+      "description": "工坊场景",
+      "input": {
+        "chunk_text": "## 前往希诺宁的工坊\n\n恰斯卡：希诺宁——哦？",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "scene_name": "前往希诺宁的工坊",
+        "location_mentioned": "希诺宁的工坊"
+      }
+    },
+    {
+      "id": "meta_032",
+      "category": "character_extraction",
+      "difficulty": "easy",
+      "description": "希诺宁对话",
+      "input": {
+        "chunk_text": "希诺宁：还不都是最近那些秘源机兵害的…玛薇卡要我找个解决方案出来\n\n希诺宁：托她的福，我已经翻了快一天的资料了…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["希诺宁"],
+        "mentioned_characters": ["玛薇卡"]
+      }
+    },
+    {
+      "id": "meta_033",
+      "category": "choice_detection",
+      "difficulty": "medium",
+      "description": "茜特菈莉选项",
+      "input": {
+        "chunk_text": "## 选项\n- 茜特菈莉才不会收学徒…\n- 茜特菈莉才不会这么做…\n\n玩家：茜特菈莉才不会收学徒…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "has_choice": true,
+        "choice_count": 2,
+        "mentioned_in_options": ["茜特菈莉"]
+      }
+    },
+    {
+      "id": "meta_034",
+      "category": "character_extraction",
+      "difficulty": "medium",
+      "description": "密码筒讨论角色",
+      "input": {
+        "chunk_text": "伊法：上面还有密码盘，看起来应该是输入密码后才能打开的结构。\n\n恰斯卡：真麻烦…不能直接来上一枪吗？\n\n伊法：我在悬木人见过类似的东西",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["伊法", "恰斯卡"],
+        "organizations_mentioned": ["悬木人"]
+      }
+    },
+    {
+      "id": "meta_035",
+      "category": "event_order",
+      "difficulty": "easy",
+      "description": "第一场景事件顺序",
+      "input": {
+        "chapter_number": 0,
+        "scene_order": 0,
+        "chunk_order": 0
+      },
+      "expected_metadata": {
+        "event_order": 0
+      }
+    },
+    {
+      "id": "meta_036",
+      "category": "character_extraction",
+      "difficulty": "hard",
+      "description": "机器人特征对话",
+      "input": {
+        "chunk_text": "？？？：「头疼」…检索近义词…「思维模块」「痛苦」。是的。\n\n？？？：执行使命…给白色飞行物和金发旅行者送信…确认信件位置，已经送达。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["？？？"],
+        "character_type": "robot",
+        "robot_speech_patterns": ["检索", "执行使命", "确认"]
+      }
+    },
+    {
+      "id": "meta_037",
+      "category": "scene_name",
+      "difficulty": "easy",
+      "description": "会面场景",
+      "input": {
+        "chunk_text": "## 与商队成员会面\n\n爱莱妲：啊——伊涅芙姐姐！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "scene_name": "与商队成员会面"
+      }
+    },
+    {
+      "id": "meta_038",
+      "category": "character_extraction",
+      "difficulty": "medium",
+      "description": "愚人众相关对话",
+      "input": {
+        "chunk_text": "卓新：嗯…是从北边来的愚人众。\n\n卓新：他们最近在挪德卡莱做了不少大动作，和本地的教团起了许多摩擦。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["卓新"],
+        "factions_mentioned": ["愚人众"]
+      }
+    },
+    {
+      "id": "meta_039",
+      "category": "task_info",
+      "difficulty": "medium",
+      "description": "第二章信息",
+      "input": {
+        "header_text": "# 归途 - 第2章：...\n# 空月之歌 第二幕",
+        "source_file": "Data/1600/chapter2_dialogue.txt"
+      },
+      "expected_metadata": {
+        "task_id": "1600",
+        "chapter_number": 2,
+        "series_name": "空月之歌 第二幕"
+      }
+    },
+    {
+      "id": "meta_040",
+      "category": "character_extraction",
+      "difficulty": "easy",
+      "description": "告别场景角色",
+      "input": {
+        "chunk_text": "基尼奇：那我去联络其他能帮上忙的人了。「杜麦尼」，派蒙，再会。\n\n派蒙：再见！基尼奇——啊，还有阿乔！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "expected_metadata": {
+        "characters": ["基尼奇", "派蒙"],
+        "addressed_characters": ["杜麦尼", "派蒙", "阿乔"]
+      }
+    }
+  ]
+}

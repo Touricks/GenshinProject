@@ -11,7 +11,7 @@
 | 文档 | 状态 | 说明 |
 |------|------|------|
 | [system-architecture.md](./system-architecture.md) | `Approved` | 系统架构 & 技术选型 |
-| [data-pipeline.md](./data-pipeline.md) | `Draft` | 数据处理流水线设计 |
+| [ingestion.md](./ingestion.md) | `Draft` | 数据处理流水线设计 |
 | [data-model.md](./data-model.md) | `Draft` | Neo4j 图数据库 Schema |
 
 ---
@@ -67,7 +67,7 @@
 ```
 system-architecture.md (技术栈 & 整体架构)
          │
-         ├──► data-pipeline.md (数据处理详细设计)
+         ├──► ingestion.md (数据处理详细设计)
          │
          └──► data-model.md (数据模型详细设计)
 ```

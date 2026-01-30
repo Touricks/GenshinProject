@@ -1,0 +1,531 @@
+{
+  "version": "1.0",
+  "description": "分块质量测试集 - 验证场景边界识别、大小约束和上下文保持",
+  "created_at": "2026-01-29",
+  "target_metrics": {
+    "boundary_f1": 0.90,
+    "size_compliance": 0.95,
+    "context_coherence": 0.80
+  },
+  "items": [
+    {
+      "id": "chunk_001",
+      "category": "scene_boundary",
+      "difficulty": "easy",
+      "description": "单一场景，标准对话格式",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 12,
+        "end_line": 75,
+        "raw_text": "## 与恰斯卡对话\n\n伊法：…伤口已经处理完了。所以你是在哪发现的它？怎么会伤成这样？\n\n恰斯卡：就在附近的海滩上，还是那些家伙干的…\n\n派蒙：——嘿！恰斯卡，你们围在这做什么呢？\n\n恰斯卡：嗯，派蒙？还有我们的「杜麦尼」？\n\n伊法：「杜麦尼」？派蒙？好久不见。"
+      },
+      "expected": {
+        "chunk_count": 1,
+        "scene_names": ["与恰斯卡对话"],
+        "boundary_markers": ["## 与恰斯卡对话"],
+        "characters": ["伊法", "恰斯卡", "派蒙"]
+      }
+    },
+    {
+      "id": "chunk_002",
+      "category": "scene_boundary",
+      "difficulty": "easy",
+      "description": "场景切换标记（---）识别",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 76,
+        "end_line": 94,
+        "raw_text": "---\n\n## 前往附近的海岸\n\n？？？：稍早之前…\n\n？？？：……\n\n？？？：…在哪里…\n\n？？？：…要…找到…他们…\n\n小机器人：滴…滴…嘟…\n\n？？？：…Traveler…派蒙…\n\n？？？：…然后…「回家」…"
+      },
+      "expected": {
+        "chunk_count": 1,
+        "scene_names": ["前往附近的海岸"],
+        "boundary_markers": ["---", "## 前往附近的海岸"],
+        "characters": ["？？？", "小机器人"]
+      }
+    },
+    {
+      "id": "chunk_003",
+      "category": "scene_boundary",
+      "difficulty": "medium",
+      "description": "连续小场景（任务指示类）",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 96,
+        "end_line": 99,
+        "raw_text": "## 击败秘源机兵\n\n## 查看情况\n\n恰斯卡：呼…伊法，你那边怎么样？她受伤严重吗？"
+      },
+      "expected": {
+        "chunk_count": 2,
+        "scene_names": ["击败秘源机兵", "查看情况"],
+        "boundary_markers": ["## 击败秘源机兵", "## 查看情况"],
+        "notes": "任务指示场景可能为空或极短"
+      }
+    },
+    {
+      "id": "chunk_004",
+      "category": "choice_detection",
+      "difficulty": "easy",
+      "description": "选项块识别",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 62,
+        "end_line": 74,
+        "raw_text": "## 选项\n- 想再多陪陪朋友。\n- 想打发一下时间。\n\n玩家：想再多陪陪朋友。\n\n恰斯卡：呵…这么一说，确实很久没跟你们一起作战了。那就当作去兜个风？海边怎么样，秘源机兵在那活动得挺频繁。\n\n派蒙：好嘞！出发出发！"
+      },
+      "expected": {
+        "chunk_count": 1,
+        "has_choice": true,
+        "choice_options": ["想再多陪陪朋友。", "想打发一下时间。"],
+        "selected_option": "想再多陪陪朋友。"
+      }
+    },
+    {
+      "id": "chunk_005",
+      "category": "choice_detection",
+      "difficulty": "medium",
+      "description": "三选项块",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 372,
+        "end_line": 384,
+        "raw_text": "## 选项\n- 蓝色的书籍\n- 红色的书籍\n- 绿色的书籍\n\n玩家：蓝色的书籍\n\n？？？：《异邦人喧哗旅~吹向金发武士的死亡之风》…动作描写清晰干练，没有故事情节。分类：武术技巧。\n\n恰斯卡：等等…那是茜特菈莉上次落在这的轻小说吗？"
+      },
+      "expected": {
+        "chunk_count": 1,
+        "has_choice": true,
+        "choice_options": ["蓝色的书籍", "红色的书籍", "绿色的书籍"],
+        "selected_option": "蓝色的书籍"
+      }
+    },
+    {
+      "id": "chunk_006",
+      "category": "size_constraint",
+      "difficulty": "easy",
+      "description": "短对话场景（接近下限）",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 78,
+        "end_line": 93,
+        "raw_text": "## 前往附近的海岸\n\n？？？：稍早之前…\n\n？？？：……\n\n？？？：…在哪里…\n\n？？？：…要…找到…他们…\n\n小机器人：滴…滴…嘟…\n\n？？？：…Traveler…派蒙…\n\n？？？：…然后…「回家」…"
+      },
+      "expected": {
+        "chunk_sizes": {"min": 100, "max": 300},
+        "within_limits": true,
+        "notes": "短场景，可能需要与相邻场景合并"
+      }
+    },
+    {
+      "id": "chunk_007",
+      "category": "size_constraint",
+      "difficulty": "hard",
+      "description": "长对话场景（需要分割）",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 170,
+        "end_line": 361,
+        "raw_text": "## 前往希诺宁的工坊\n\n恰斯卡：希诺宁——哦？这个时间点，难得见你没在睡午觉。\n\n希诺宁：嘁，才走一个玛薇卡，又来一个恰斯卡…你是专程来挖苦我的吗？\n\n[...长对话...]"
+      },
+      "expected": {
+        "chunk_count_min": 2,
+        "chunk_count_max": 4,
+        "each_chunk_max": 1500,
+        "context_preserved": true
+      }
+    },
+    {
+      "id": "chunk_008",
+      "category": "context_preservation",
+      "difficulty": "medium",
+      "description": "对话连贯性保持",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 100,
+        "end_line": 140,
+        "raw_text": "恰斯卡：呼…伊法，你那边怎么样？她受伤严重吗？\n\n伊法：…很难说。你们自己来看吧，情急的时候让一个「兽医」救救「人」也就罢了…但这种情况…\n\n咔库库：——这是人吗？哥们！\n\n派蒙：啊…这是…机关？！\n\n恰斯卡：机关…拼成的人偶？是什么新型的秘源机兵吗…"
+      },
+      "expected": {
+        "dialogue_integrity": true,
+        "no_mid_sentence_split": true,
+        "speaker_turn_preserved": true
+      }
+    },
+    {
+      "id": "chunk_009",
+      "category": "scene_boundary",
+      "difficulty": "easy",
+      "description": "剧情简介区块",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 5,
+        "end_line": 8,
+        "raw_text": "## 剧情简介\n纳塔似乎迎来了一些意料之外的客人…\n\n---"
+      },
+      "expected": {
+        "chunk_count": 1,
+        "scene_names": ["剧情简介"],
+        "is_synopsis": true,
+        "boundary_markers": ["## 剧情简介", "---"]
+      }
+    },
+    {
+      "id": "chunk_010",
+      "category": "scene_boundary",
+      "difficulty": "easy",
+      "description": "空场景标题（仅任务指示）",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 10,
+        "end_line": 11,
+        "raw_text": "## 前往花羽会\n\n## 与恰斯卡对话"
+      },
+      "expected": {
+        "chunk_count": 1,
+        "scene_names": ["前往花羽会"],
+        "is_empty_scene": true,
+        "notes": "无对话的导航指示场景"
+      }
+    },
+    {
+      "id": "chunk_011",
+      "category": "context_preservation",
+      "difficulty": "hard",
+      "description": "回忆/闪回场景识别",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 80,
+        "end_line": 93,
+        "raw_text": "？？？：稍早之前…\n\n？？？：……\n\n？？？：…在哪里…"
+      },
+      "expected": {
+        "is_flashback": true,
+        "temporal_marker": "稍早之前",
+        "narrative_layer": "memory"
+      }
+    },
+    {
+      "id": "chunk_012",
+      "category": "scene_boundary",
+      "difficulty": "medium",
+      "description": "NPC引入场景",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 443,
+        "end_line": 462,
+        "raw_text": "阿乔：哇——什么声音那么大！是打雷了吗？是打雷了吧！——怎么没劈在这家伙头上？\n\n基尼奇：…真打雷的话，我会先把你往天上扔。\n\n玩家：…基尼奇？\n\n基尼奇：我听伊法说，你们送了一个机关人偶来回声之子，根据描述，很像我的「委托目标」。"
+      },
+      "expected": {
+        "chunk_count": 1,
+        "new_characters_introduced": ["阿乔", "基尼奇"],
+        "characters": ["阿乔", "基尼奇", "玩家"]
+      }
+    },
+    {
+      "id": "chunk_013",
+      "category": "scene_boundary",
+      "difficulty": "medium",
+      "description": "商队会面场景",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 465,
+        "end_line": 478,
+        "raw_text": "## 与商队成员会面\n\n爱莱妲：啊——伊涅芙姐姐！\n\n？？？：…伊涅芙…？\n\n艾慕：伊涅芙！总算找到你了…谢天谢地，你没出事就好…\n\n？？？：…请问你们是？\n\n卓新：你这是…又失忆了吗？这次难道连名字也…"
+      },
+      "expected": {
+        "chunk_count": 1,
+        "scene_names": ["与商队成员会面"],
+        "characters": ["爱莱妲", "？？？", "艾慕", "卓新"],
+        "entity_reveal": {"？？？": "伊涅芙"}
+      }
+    },
+    {
+      "id": "chunk_014",
+      "category": "choice_detection",
+      "difficulty": "easy",
+      "description": "双选项块（标准）",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 120,
+        "end_line": 125,
+        "raw_text": "## 选项\n- 没听错，我也听到了。\n- 确实是我们的名字…\n\n玩家：没听错，我也听到了。"
+      },
+      "expected": {
+        "chunk_count": 1,
+        "has_choice": true,
+        "choice_options": ["没听错，我也听到了。", "确实是我们的名字…"],
+        "selected_option": "没听错，我也听到了。"
+      }
+    },
+    {
+      "id": "chunk_015",
+      "category": "size_constraint",
+      "difficulty": "medium",
+      "description": "中等长度对话",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 500,
+        "end_line": 550,
+        "raw_text": "卓新：抱歉…忘了自我介绍——我叫卓新，是一名商人，这两位是我的妻女…还有这些朋友，我们都是从挪德卡莱来的。\n\n派蒙：挪德卡莱！？\n\n恰斯卡：但看你们的装束，倒不像是一路人？\n\n卓新：挪德卡莱…是一处流浪之地，汇集了来自各国的人。"
+      },
+      "expected": {
+        "chunk_sizes": {"min": 400, "max": 800},
+        "within_limits": true,
+        "characters": ["卓新", "派蒙", "恰斯卡"]
+      }
+    },
+    {
+      "id": "chunk_016",
+      "category": "context_preservation",
+      "difficulty": "hard",
+      "description": "诅咒/特殊事件文本",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 422,
+        "end_line": 438,
+        "raw_text": "黑雾诅咒：——「悖谬」。\n\n黑雾诅咒：此非正途。此非归处。\n\n黑雾诅咒：离经叛道的「悖谬」…也敢追索所谓「归宿」？\n\n？？？：唔…！\n\n派蒙：啊…你…你怎么了？没事吧？\n\n？？？：不要…过来！"
+      },
+      "expected": {
+        "special_speaker": "黑雾诅咒",
+        "is_system_event": true,
+        "characters": ["黑雾诅咒", "？？？", "派蒙"]
+      }
+    },
+    {
+      "id": "chunk_017",
+      "category": "scene_boundary",
+      "difficulty": "easy",
+      "description": "任务整理场景",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 364,
+        "end_line": 369,
+        "raw_text": "## 整理箱子\n\n## 拾起杂物并清理地面污渍\n\n## 收拾书籍\n\n？？？：开始整理，小型物件。"
+      },
+      "expected": {
+        "chunk_count": 3,
+        "scene_names": ["整理箱子", "拾起杂物并清理地面污渍", "收拾书籍"],
+        "is_task_sequence": true
+      }
+    },
+    {
+      "id": "chunk_018",
+      "category": "context_preservation",
+      "difficulty": "medium",
+      "description": "暗处旁观者对话",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 160,
+        "end_line": 167,
+        "raw_text": "维李米尔：…哼。\n\n「木偶」：…纳塔的古龙文明？呵…\n\n「木偶」：想去折腾就随你们吧，不过要记得留意一个「变数」…\n\n维李米尔：…撤吧。没必要冒这个风险…"
+      },
+      "expected": {
+        "is_cutaway": true,
+        "characters": ["维李米尔", "「木偶」"],
+        "narrative_perspective": "antagonist"
+      }
+    },
+    {
+      "id": "chunk_019",
+      "category": "scene_boundary",
+      "difficulty": "easy",
+      "description": "织物查看场景",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 387,
+        "end_line": 420,
+        "raw_text": "## 查看织物\n\n派蒙：总算理完了…咦？箱子下面还有幅织卷？好像有点脏了…能拜托你清洁一下吗？\n\n？？？：了解。开始清洁，手工织物。\n\n派蒙：哇…简直像新的一样…欸？这个看着像回声之子的人…是希诺宁的亲戚吗？"
+      },
+      "expected": {
+        "chunk_count": 1,
+        "scene_names": ["查看织物"],
+        "characters": ["派蒙", "？？？", "希诺宁", "恰斯卡"]
+      }
+    },
+    {
+      "id": "chunk_020",
+      "category": "context_preservation",
+      "difficulty": "hard",
+      "description": "历史叙述段落",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 395,
+        "end_line": 421,
+        "raw_text": "希诺宁：那可不是我亲戚…她是回声之子的先祖，纳塔最初的「六英杰」之一，「祝福」的伊葵。\n\n派蒙：欸？我记得「祝福」也是希诺宁的…\n\n希诺宁：没错，她就是「祝福」这个古名最初记述的英雄。\n\n希诺宁：她与伙伴们一同踏上了讨伐火龙王的旅途，拆解了无数古代龙众制造的机关，希望让它们为人类所用…"
+      },
+      "expected": {
+        "contains_lore": true,
+        "historical_entities": ["伊葵", "六英杰", "火龙王"],
+        "narrative_type": "exposition"
+      }
+    },
+    {
+      "id": "chunk_021",
+      "category": "scene_boundary",
+      "difficulty": "medium",
+      "description": "时间跳跃标记",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 657,
+        "end_line": 660,
+        "raw_text": "---\n\n？？？：转眼数天过去…"
+      },
+      "expected": {
+        "is_time_skip": true,
+        "temporal_marker": "转眼数天过去",
+        "boundary_markers": ["---"]
+      }
+    },
+    {
+      "id": "chunk_022",
+      "category": "context_preservation",
+      "difficulty": "medium",
+      "description": "角色内心独白",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 653,
+        "end_line": 656,
+        "raw_text": "阿乔：（是我的记忆出问题了吗…那个家伙…难道说…）\n\n阿乔：（哼，管她呢，跟我才没有关系呢。）"
+      },
+      "expected": {
+        "is_inner_monologue": true,
+        "character": "阿乔",
+        "monologue_markers": ["（", "）"]
+      }
+    },
+    {
+      "id": "chunk_023",
+      "category": "scene_boundary",
+      "difficulty": "easy",
+      "description": "结束分隔符",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 463,
+        "end_line": 465,
+        "raw_text": "---\n\n## 与商队成员会面"
+      },
+      "expected": {
+        "is_scene_transition": true,
+        "boundary_markers": ["---", "## 与商队成员会面"]
+      }
+    },
+    {
+      "id": "chunk_024",
+      "category": "size_constraint",
+      "difficulty": "hard",
+      "description": "超长解释性对话",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 248,
+        "end_line": 290,
+        "raw_text": "希诺宁：她不是完全「失去」了记忆，而是因为什么原因「想不起来」了。\n\n希诺宁：就像是…越是去想一件事，就越觉得「头疼」？是这样吗？\n\n？？？：「头疼」…检索近义词…「思维模块」「痛苦」。是的。\n\n派蒙：机器人…也会「痛苦」吗？\n\n希诺宁：婴儿也好，幼龙也罢，都是靠「痛觉」慢慢记住该做和不该做的事。"
+      },
+      "expected": {
+        "needs_splitting": true,
+        "split_strategy": "semantic_paragraph",
+        "characters": ["希诺宁", "？？？", "派蒙"]
+      }
+    },
+    {
+      "id": "chunk_025",
+      "category": "choice_detection",
+      "difficulty": "medium",
+      "description": "隐含多选支（相似选项）",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 148,
+        "end_line": 155,
+        "raw_text": "## 选项\n- 看来不先救醒她…\n- 什么事都弄不清楚。\n\n玩家：看来不先救醒她…\n\n恰斯卡：机关人偶和机关密码筒…全是她的专业领域了，那该上哪也不用多说了吧？"
+      },
+      "expected": {
+        "chunk_count": 1,
+        "has_choice": true,
+        "choice_type": "continuation",
+        "choice_options": ["看来不先救醒她…", "什么事都弄不清楚。"]
+      }
+    },
+    {
+      "id": "chunk_026",
+      "category": "context_preservation",
+      "difficulty": "easy",
+      "description": "学舌龙对话",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 26,
+        "end_line": 33,
+        "raw_text": "咔库库：幸会啊，哥们！\n\n派蒙：——学舌怪怪龙！\n\n派蒙：啊…龙说话了！\n\n伊法：不用惊讶，只是在学舌罢了。"
+      },
+      "expected": {
+        "characters": ["咔库库", "派蒙", "伊法"],
+        "special_character_type": {"咔库库": "echo_dragon"}
+      }
+    },
+    {
+      "id": "chunk_027",
+      "category": "scene_boundary",
+      "difficulty": "medium",
+      "description": "记忆片段插入",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 483,
+        "end_line": 494,
+        "raw_text": "？？？：…「爱诺」？\n\n爱诺：…从今天起你就叫「伊涅芙」啦！\n\n爱诺：——一定、一定要记得回来！\n\n黑雾诅咒：…「悖谬」。\n\n？？？：…唔！"
+      },
+      "expected": {
+        "is_memory_fragment": true,
+        "memory_character": "爱诺",
+        "triggered_by": "「爱诺」"
+      }
+    },
+    {
+      "id": "chunk_028",
+      "category": "size_constraint",
+      "difficulty": "easy",
+      "description": "简短问答交互",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 298,
+        "end_line": 308,
+        "raw_text": "？？？：枫丹…好吃的甜点。\n\n派蒙：哇！有反应欸！\n\n玩家：虽然这反应不像人偶像派蒙…\n\n派蒙：喂！算了…先不计较这个——枫丹就是你的家吗？\n\n？？？：不是。"
+      },
+      "expected": {
+        "chunk_sizes": {"min": 150, "max": 300},
+        "within_limits": true,
+        "characters": ["？？？", "派蒙", "玩家"]
+      }
+    },
+    {
+      "id": "chunk_029",
+      "category": "context_preservation",
+      "difficulty": "hard",
+      "description": "愚人众相关叙述",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 513,
+        "end_line": 522,
+        "raw_text": "卓新：嗯…是从北边来的愚人众。\n\n卓新：他们最近在挪德卡莱做了不少大动作，和本地的教团起了许多摩擦。\n\n阿西木：岂止是摩擦！我还听说…他们把「月亮」都给拉下来了！\n\n埃德恩：「月亮」…还有那些「月神像」的事…「霜月之子」肯定不会善罢甘休吧？"
+      },
+      "expected": {
+        "contains_faction_info": true,
+        "factions_mentioned": ["愚人众", "霜月之子"],
+        "characters": ["卓新", "阿西木", "埃德恩"]
+      }
+    },
+    {
+      "id": "chunk_030",
+      "category": "scene_boundary",
+      "difficulty": "medium",
+      "description": "章节结尾场景",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "start_line": 633,
+        "end_line": 660,
+        "raw_text": "基尼奇：那我去联络其他能帮上忙的人了。「杜麦尼」，派蒙，再会。\n\n派蒙：再见！基尼奇——啊，还有阿乔！\n\n派蒙：奇怪…阿乔今天好像很安静啊？\n\n[...]\n\n？？？：转眼数天过去…"
+      },
+      "expected": {
+        "is_chapter_end": true,
+        "ends_with_time_skip": true,
+        "characters": ["基尼奇", "派蒙", "阿乔"]
+      }
+    }
+  ]
+}

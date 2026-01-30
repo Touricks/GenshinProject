@@ -1,0 +1,330 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-01-29T22:38:27.638719",
+  "files": {
+    "Data/1500/chapter0_dialogue.txt": {
+      "file_path": "Data/1500/chapter0_dialogue.txt",
+      "content_hash": "94556cade895bb3213dfbb4a902930ea",
+      "last_indexed": "2026-01-29T22:38:27.625715",
+      "chunk_count": 17
+    },
+    "Data/1500/chapter1_dialogue.txt": {
+      "file_path": "Data/1500/chapter1_dialogue.txt",
+      "content_hash": "9662a99c415cb39a6ec3ef15145ea6d6",
+      "last_indexed": "2026-01-29T22:38:27.626073",
+      "chunk_count": 15
+    },
+    "Data/1500/chapter2_dialogue.txt": {
+      "file_path": "Data/1500/chapter2_dialogue.txt",
+      "content_hash": "930732e264adf1f4f5f86f6e53522127",
+      "last_indexed": "2026-01-29T22:38:27.626361",
+      "chunk_count": 15
+    },
+    "Data/1501/chapter0_dialogue.txt": {
+      "file_path": "Data/1501/chapter0_dialogue.txt",
+      "content_hash": "65bab3e45da88bc05ccf334bebb76d64",
+      "last_indexed": "2026-01-29T22:38:27.626679",
+      "chunk_count": 10
+    },
+    "Data/1501/chapter1_dialogue.txt": {
+      "file_path": "Data/1501/chapter1_dialogue.txt",
+      "content_hash": "3b7270d0896504dd864a66809518fd18",
+      "last_indexed": "2026-01-29T22:38:27.626935",
+      "chunk_count": 13
+    },
+    "Data/1501/chapter2_dialogue.txt": {
+      "file_path": "Data/1501/chapter2_dialogue.txt",
+      "content_hash": "60cd3668bdc628852bb5f64583e7dd24",
+      "last_indexed": "2026-01-29T22:38:27.627128",
+      "chunk_count": 14
+    },
+    "Data/1501/chapter3_dialogue.txt": {
+      "file_path": "Data/1501/chapter3_dialogue.txt",
+      "content_hash": "8d51cec9b245dbef6b5c88394d9b2b77",
+      "last_indexed": "2026-01-29T22:38:27.627319",
+      "chunk_count": 13
+    },
+    "Data/1501/chapter4_dialogue.txt": {
+      "file_path": "Data/1501/chapter4_dialogue.txt",
+      "content_hash": "d5b42d06261767e4af5d19623d828241",
+      "last_indexed": "2026-01-29T22:38:27.627551",
+      "chunk_count": 14
+    },
+    "Data/1502/chapter0_dialogue.txt": {
+      "file_path": "Data/1502/chapter0_dialogue.txt",
+      "content_hash": "1e0d5f97d83efed90a1043fab62b8dc2",
+      "last_indexed": "2026-01-29T22:38:27.627739",
+      "chunk_count": 19
+    },
+    "Data/1502/chapter1_dialogue.txt": {
+      "file_path": "Data/1502/chapter1_dialogue.txt",
+      "content_hash": "9a4f7962a9253a5e0c90f61a26d14dc3",
+      "last_indexed": "2026-01-29T22:38:27.628022",
+      "chunk_count": 43
+    },
+    "Data/1502/chapter2_dialogue.txt": {
+      "file_path": "Data/1502/chapter2_dialogue.txt",
+      "content_hash": "daa324f5b0717eeb105978a23f8032f5",
+      "last_indexed": "2026-01-29T22:38:27.628290",
+      "chunk_count": 45
+    },
+    "Data/1503/chapter0_dialogue.txt": {
+      "file_path": "Data/1503/chapter0_dialogue.txt",
+      "content_hash": "804cddc0139dbdb7e72ad87972c0d588",
+      "last_indexed": "2026-01-29T22:38:27.628511",
+      "chunk_count": 11
+    },
+    "Data/1503/chapter1_dialogue.txt": {
+      "file_path": "Data/1503/chapter1_dialogue.txt",
+      "content_hash": "3fc962db366f282dffddb900aeaff0fb",
+      "last_indexed": "2026-01-29T22:38:27.628725",
+      "chunk_count": 9
+    },
+    "Data/1503/chapter2_dialogue.txt": {
+      "file_path": "Data/1503/chapter2_dialogue.txt",
+      "content_hash": "ab198efcfaf57812711f71c795bbe288",
+      "last_indexed": "2026-01-29T22:38:27.628918",
+      "chunk_count": 10
+    },
+    "Data/1503/chapter3_dialogue.txt": {
+      "file_path": "Data/1503/chapter3_dialogue.txt",
+      "content_hash": "f27d47637e6499ce8bd32d4e4641171a",
+      "last_indexed": "2026-01-29T22:38:27.629106",
+      "chunk_count": 21
+    },
+    "Data/1503/chapter4_dialogue.txt": {
+      "file_path": "Data/1503/chapter4_dialogue.txt",
+      "content_hash": "32b48f97d499a73a8a9ed726122bd817",
+      "last_indexed": "2026-01-29T22:38:27.629229",
+      "chunk_count": 1
+    },
+    "Data/1503/chapter5_dialogue.txt": {
+      "file_path": "Data/1503/chapter5_dialogue.txt",
+      "content_hash": "a0d5b20219dd5597a5eac97ee95ed126",
+      "last_indexed": "2026-01-29T22:38:27.629432",
+      "chunk_count": 9
+    },
+    "Data/1504/chapter0_dialogue.txt": {
+      "file_path": "Data/1504/chapter0_dialogue.txt",
+      "content_hash": "a5d999dd268d02d837fc80a7517b30f3",
+      "last_indexed": "2026-01-29T22:38:27.629583",
+      "chunk_count": 4
+    },
+    "Data/1504/chapter1_dialogue.txt": {
+      "file_path": "Data/1504/chapter1_dialogue.txt",
+      "content_hash": "dc3629c4639ddafc85dac916f7ac81ba",
+      "last_indexed": "2026-01-29T22:38:27.630022",
+      "chunk_count": 34
+    },
+    "Data/1504/chapter2_dialogue.txt": {
+      "file_path": "Data/1504/chapter2_dialogue.txt",
+      "content_hash": "892859a4c51ca6b8d2a74cfffd804f99",
+      "last_indexed": "2026-01-29T22:38:27.630291",
+      "chunk_count": 26
+    },
+    "Data/1504/chapter3_dialogue.txt": {
+      "file_path": "Data/1504/chapter3_dialogue.txt",
+      "content_hash": "e29909416d1bd230240ee872f874d428",
+      "last_indexed": "2026-01-29T22:38:27.630425",
+      "chunk_count": 2
+    },
+    "Data/1504/chapter4_dialogue.txt": {
+      "file_path": "Data/1504/chapter4_dialogue.txt",
+      "content_hash": "80ce80771f5a04cb2c78b26ce8df58f5",
+      "last_indexed": "2026-01-29T22:38:27.630740",
+      "chunk_count": 31
+    },
+    "Data/1505/chapter0_dialogue.txt": {
+      "file_path": "Data/1505/chapter0_dialogue.txt",
+      "content_hash": "96e44ed5315d7cf13bf80d00a5b84784",
+      "last_indexed": "2026-01-29T22:38:27.631022",
+      "chunk_count": 20
+    },
+    "Data/1506/chapter0_dialogue.txt": {
+      "file_path": "Data/1506/chapter0_dialogue.txt",
+      "content_hash": "f5cc5405e37cc99e4ae3aa6bafab833e",
+      "last_indexed": "2026-01-29T22:38:27.631217",
+      "chunk_count": 4
+    },
+    "Data/1506/chapter1_dialogue.txt": {
+      "file_path": "Data/1506/chapter1_dialogue.txt",
+      "content_hash": "168eb216abedd9ff3f97215d208c0dfc",
+      "last_indexed": "2026-01-29T22:38:27.631415",
+      "chunk_count": 12
+    },
+    "Data/1506/chapter2_dialogue.txt": {
+      "file_path": "Data/1506/chapter2_dialogue.txt",
+      "content_hash": "1111c0d3f713d9944ad54c1048a7416b",
+      "last_indexed": "2026-01-29T22:38:27.631691",
+      "chunk_count": 13
+    },
+    "Data/1600/chapter0_dialogue.txt": {
+      "file_path": "Data/1600/chapter0_dialogue.txt",
+      "content_hash": "0ddc3de57d8cc6d264ad6c05a6e30d75",
+      "last_indexed": "2026-01-29T22:38:27.631915",
+      "chunk_count": 13
+    },
+    "Data/1600/chapter1_dialogue.txt": {
+      "file_path": "Data/1600/chapter1_dialogue.txt",
+      "content_hash": "e6f0b3984f12b13dbdb2742ef152ad6b",
+      "last_indexed": "2026-01-29T22:38:27.632161",
+      "chunk_count": 21
+    },
+    "Data/1600/chapter2_dialogue.txt": {
+      "file_path": "Data/1600/chapter2_dialogue.txt",
+      "content_hash": "0d428835b63c1e4544ef1698d4fc9f3f",
+      "last_indexed": "2026-01-29T22:38:27.632378",
+      "chunk_count": 17
+    },
+    "Data/1601/chapter0_dialogue.txt": {
+      "file_path": "Data/1601/chapter0_dialogue.txt",
+      "content_hash": "e4e77871eadb677932290dfa4363c110",
+      "last_indexed": "2026-01-29T22:38:27.632677",
+      "chunk_count": 34
+    },
+    "Data/1601/chapter1_dialogue.txt": {
+      "file_path": "Data/1601/chapter1_dialogue.txt",
+      "content_hash": "dddc54d508390d51ec9cfd42b5581bc0",
+      "last_indexed": "2026-01-29T22:38:27.632858",
+      "chunk_count": 13
+    },
+    "Data/1601/chapter2_dialogue.txt": {
+      "file_path": "Data/1601/chapter2_dialogue.txt",
+      "content_hash": "7df0a5406a6aa09c7e3355e81bcd7c9d",
+      "last_indexed": "2026-01-29T22:38:27.633129",
+      "chunk_count": 33
+    },
+    "Data/1602/chapter0_dialogue.txt": {
+      "file_path": "Data/1602/chapter0_dialogue.txt",
+      "content_hash": "ae4862b15ad73d846ba47102013331ca",
+      "last_indexed": "2026-01-29T22:38:27.633419",
+      "chunk_count": 18
+    },
+    "Data/1602/chapter1_dialogue.txt": {
+      "file_path": "Data/1602/chapter1_dialogue.txt",
+      "content_hash": "9f0dee945eaf8f6e7cbaaad90304f512",
+      "last_indexed": "2026-01-29T22:38:27.633613",
+      "chunk_count": 4
+    },
+    "Data/1602/chapter2_dialogue.txt": {
+      "file_path": "Data/1602/chapter2_dialogue.txt",
+      "content_hash": "f51dbc6b4237925025ef48b10338eadb",
+      "last_indexed": "2026-01-29T22:38:27.633869",
+      "chunk_count": 17
+    },
+    "Data/1602/chapter3_dialogue.txt": {
+      "file_path": "Data/1602/chapter3_dialogue.txt",
+      "content_hash": "61d5d8fa1cfdc13d7510c588d6ae6a2c",
+      "last_indexed": "2026-01-29T22:38:27.634092",
+      "chunk_count": 16
+    },
+    "Data/1602/chapter4_dialogue.txt": {
+      "file_path": "Data/1602/chapter4_dialogue.txt",
+      "content_hash": "7eda0b1cfe65085cbc56465971343811",
+      "last_indexed": "2026-01-29T22:38:27.634237",
+      "chunk_count": 11
+    },
+    "Data/1603/chapter0_dialogue.txt": {
+      "file_path": "Data/1603/chapter0_dialogue.txt",
+      "content_hash": "4ae5b3eebcb0f21c76ff1caedf0432f9",
+      "last_indexed": "2026-01-29T22:38:27.634457",
+      "chunk_count": 10
+    },
+    "Data/1603/chapter1_dialogue.txt": {
+      "file_path": "Data/1603/chapter1_dialogue.txt",
+      "content_hash": "91e1345706ae5ed7d569a09b988ce6b4",
+      "last_indexed": "2026-01-29T22:38:27.634652",
+      "chunk_count": 14
+    },
+    "Data/1603/chapter2_dialogue.txt": {
+      "file_path": "Data/1603/chapter2_dialogue.txt",
+      "content_hash": "e4ba95ff66882663a8e585cfc7d37b8d",
+      "last_indexed": "2026-01-29T22:38:27.634882",
+      "chunk_count": 15
+    },
+    "Data/1604/chapter0_dialogue.txt": {
+      "file_path": "Data/1604/chapter0_dialogue.txt",
+      "content_hash": "ae9bf447e9777f0007ff27d308d288f7",
+      "last_indexed": "2026-01-29T22:38:27.635181",
+      "chunk_count": 29
+    },
+    "Data/1604/chapter1_dialogue.txt": {
+      "file_path": "Data/1604/chapter1_dialogue.txt",
+      "content_hash": "bfcde8899ea978fd2df9eab7de472b7a",
+      "last_indexed": "2026-01-29T22:38:27.635413",
+      "chunk_count": 16
+    },
+    "Data/1604/chapter2_dialogue.txt": {
+      "file_path": "Data/1604/chapter2_dialogue.txt",
+      "content_hash": "fe94a44ca0f8e3ce37fcb946c7e3718d",
+      "last_indexed": "2026-01-29T22:38:27.635753",
+      "chunk_count": 20
+    },
+    "Data/1605/chapter0_dialogue.txt": {
+      "file_path": "Data/1605/chapter0_dialogue.txt",
+      "content_hash": "f572e7ad4a0cd558944ca596be66ed4c",
+      "last_indexed": "2026-01-29T22:38:27.635942",
+      "chunk_count": 7
+    },
+    "Data/1605/chapter1_dialogue.txt": {
+      "file_path": "Data/1605/chapter1_dialogue.txt",
+      "content_hash": "ce28b8163f05e9d6a2da6f97a284e4c1",
+      "last_indexed": "2026-01-29T22:38:27.636311",
+      "chunk_count": 35
+    },
+    "Data/1606/chapter0_dialogue.txt": {
+      "file_path": "Data/1606/chapter0_dialogue.txt",
+      "content_hash": "87e09db8f01142f9b1849a15e8e357c4",
+      "last_indexed": "2026-01-29T22:38:27.636499",
+      "chunk_count": 10
+    },
+    "Data/1606/chapter1_dialogue.txt": {
+      "file_path": "Data/1606/chapter1_dialogue.txt",
+      "content_hash": "d9884ac7c772f9d8904e291344023953",
+      "last_indexed": "2026-01-29T22:38:27.636794",
+      "chunk_count": 19
+    },
+    "Data/1606/chapter2_dialogue.txt": {
+      "file_path": "Data/1606/chapter2_dialogue.txt",
+      "content_hash": "61e235e34fef31f19f0e1223f8fc06f4",
+      "last_indexed": "2026-01-29T22:38:27.636972",
+      "chunk_count": 5
+    },
+    "Data/1607/chapter0_dialogue.txt": {
+      "file_path": "Data/1607/chapter0_dialogue.txt",
+      "content_hash": "04b22f78bf4e0881ab52d0ba9a04cdd9",
+      "last_indexed": "2026-01-29T22:38:27.637106",
+      "chunk_count": 6
+    },
+    "Data/1607/chapter1_dialogue.txt": {
+      "file_path": "Data/1607/chapter1_dialogue.txt",
+      "content_hash": "0369cc6d54ddc0dbcd320cb6423c6c79",
+      "last_indexed": "2026-01-29T22:38:27.637383",
+      "chunk_count": 18
+    },
+    "Data/1607/chapter2_dialogue.txt": {
+      "file_path": "Data/1607/chapter2_dialogue.txt",
+      "content_hash": "e65f0a81b638f993df6c7f7bbf9905b4",
+      "last_indexed": "2026-01-29T22:38:27.637641",
+      "chunk_count": 22
+    },
+    "Data/1608/chapter0_dialogue.txt": {
+      "file_path": "Data/1608/chapter0_dialogue.txt",
+      "content_hash": "d744c5b319a9a2b1b178f26808651533",
+      "last_indexed": "2026-01-29T22:38:27.637940",
+      "chunk_count": 23
+    },
+    "Data/1608/chapter1_dialogue.txt": {
+      "file_path": "Data/1608/chapter1_dialogue.txt",
+      "content_hash": "3c03cc562e42210961e6b93ef6b5950e",
+      "last_indexed": "2026-01-29T22:38:27.638094",
+      "chunk_count": 6
+    },
+    "Data/1608/chapter2_dialogue.txt": {
+      "file_path": "Data/1608/chapter2_dialogue.txt",
+      "content_hash": "9145f04015033cf9da0728c864abc571",
+      "last_indexed": "2026-01-29T22:38:27.638353",
+      "chunk_count": 11
+    }
+  }
+}

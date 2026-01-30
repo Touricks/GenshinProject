@@ -1,0 +1,386 @@
+{
+  "version": "2.0",
+  "description": "关系提取测试集 - 基于约束的评估方式",
+  "created_at": "2026-01-29",
+  "philosophy": "关系提取主观性强，测试关系存在性而非精确类型",
+  "test_types": {
+    "must_relate": "两实体之间必须存在某种关系",
+    "should_relate": "两实体之间应该存在关系（未提取不扣分）",
+    "must_not_relate": "两实体之间不应存在关系（防止幻觉）",
+    "type_hint": "如提取关系，建议的类型（非强制）"
+  },
+  "relationship_types_reference": [
+    "KNOWS", "FRIEND_OF", "WORKS_WITH", "PARTNER_OF",
+    "MEMBER_OF", "ENEMY_OF", "CREATED_BY", "IS_ALIAS_OF",
+    "PARTICIPATED_IN", "OCCURRED_AT", "LOCATED_IN"
+  ],
+  "items": [
+    {
+      "id": "rel_001",
+      "layer": "parsing",
+      "difficulty": "easy",
+      "description": "同场景对话者 - 必然认识",
+      "input": {
+        "text": "伊法：…伤口已经处理完了。\n\n恰斯卡：就在附近的海滩上。\n\n派蒙：——嘿！恰斯卡！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_relate": [
+          {"source": "伊法", "target": "恰斯卡"},
+          {"source": "恰斯卡", "target": "派蒙"}
+        ],
+        "type_hint": "KNOWS",
+        "notes": "同一场景对话的角色之间必然存在某种关系"
+      }
+    },
+    {
+      "id": "rel_002",
+      "layer": "explicit",
+      "difficulty": "easy",
+      "description": "明确的工作关系",
+      "input": {
+        "text": "恰斯卡：这位是我们部族的「医生」伊法…和他的助理咔库库。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_relate": [
+          {"source": "咔库库", "target": "伊法"}
+        ],
+        "acceptable_types": ["WORKS_WITH", "ASSISTS", "PARTNER_OF"],
+        "notes": "助理关系明确，类型可以是多种合理选项"
+      }
+    },
+    {
+      "id": "rel_003",
+      "layer": "explicit",
+      "difficulty": "easy",
+      "description": "明确的组织归属",
+      "input": {
+        "text": "恰斯卡：这位是我们部族的「医生」伊法",
+        "entities_context": ["恰斯卡", "伊法", "花羽会"],
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_relate": [
+          {"source": "伊法", "target": "花羽会"}
+        ],
+        "should_relate": [
+          {"source": "恰斯卡", "target": "花羽会"}
+        ],
+        "acceptable_types": ["MEMBER_OF", "BELONGS_TO", "AFFILIATED_WITH"],
+        "notes": "'我们部族'暗示恰斯卡也属于花羽会"
+      }
+    },
+    {
+      "id": "rel_004",
+      "layer": "explicit",
+      "difficulty": "easy",
+      "description": "龙伙伴关系",
+      "input": {
+        "text": "阿乔：哇——什么声音那么大！\n\n基尼奇：…真打雷的话，我会先把你往天上扔。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_relate": [
+          {"source": "基尼奇", "target": "阿乔", "bidirectional": true}
+        ],
+        "acceptable_types": ["PARTNER_OF", "COMPANION_OF", "WORKS_WITH"],
+        "notes": "纳塔角色与龙的伙伴关系是双向的"
+      }
+    },
+    {
+      "id": "rel_005",
+      "layer": "explicit",
+      "difficulty": "easy",
+      "description": "制造者关系",
+      "input": {
+        "text": "埃德恩：不敢不敢！我们哪有那能耐，她是爱诺造出来的…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_relate": [
+          {"source": "伊涅芙", "target": "爱诺"}
+        ],
+        "acceptable_types": ["CREATED_BY", "MADE_BY"],
+        "notes": "明确的制造关系"
+      }
+    },
+    {
+      "id": "rel_006",
+      "layer": "inferred",
+      "difficulty": "medium",
+      "description": "历史友谊推断",
+      "input": {
+        "text": "恰斯卡：呵…这么一说，确实很久没跟你们一起作战了。",
+        "entities_context": ["恰斯卡", "旅行者", "派蒙"],
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_relate": [
+          {"source": "恰斯卡", "target": "旅行者"},
+          {"source": "恰斯卡", "target": "派蒙"}
+        ],
+        "acceptable_types": ["FRIEND_OF", "KNOWS", "ALLY_OF"],
+        "notes": "从'一起作战'推断友谊/盟友关系，但类型不确定"
+      }
+    },
+    {
+      "id": "rel_007",
+      "layer": "inferred",
+      "difficulty": "medium",
+      "description": "保护关系推断",
+      "input": {
+        "text": "爱莱妲：伊涅芙姐姐为了保护我们，一个人跳下了船…还让我们赶紧逃跑…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_relate": [
+          {"source": "伊涅芙", "target": "商队"}
+        ],
+        "may_relate": [
+          {"source": "伊涅芙", "target": "爱莱妲"}
+        ],
+        "acceptable_types": ["PROTECTS", "FRIEND_OF", "CARES_FOR"],
+        "notes": "保护行为暗示某种正面关系"
+      }
+    },
+    {
+      "id": "rel_008",
+      "layer": "explicit",
+      "difficulty": "medium",
+      "description": "组织成员关系（六英杰）",
+      "input": {
+        "text": "希诺宁：她是回声之子的先祖，纳塔最初的「六英杰」之一，「祝福」的伊葵。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_relate": [
+          {"source": "伊葵", "target": "六英杰"}
+        ],
+        "should_relate": [
+          {"source": "伊葵", "target": "回声之子"}
+        ],
+        "acceptable_types": ["MEMBER_OF", "BELONGS_TO", "FOUNDER_OF"]
+      }
+    },
+    {
+      "id": "rel_009",
+      "layer": "explicit",
+      "difficulty": "medium",
+      "description": "工作委托关系",
+      "input": {
+        "text": "希诺宁：还不都是最近那些秘源机兵害的…玛薇卡要我找个解决方案出来",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_relate": [
+          {"source": "希诺宁", "target": "玛薇卡"}
+        ],
+        "acceptable_types": ["WORKS_WITH", "REPORTS_TO", "COMMISSIONED_BY"],
+        "notes": "命令/委托关系"
+      }
+    },
+    {
+      "id": "rel_010",
+      "layer": "explicit",
+      "difficulty": "medium",
+      "description": "委托寻人关系",
+      "input": {
+        "text": "基尼奇：——有一支商队委托我寻找他们失散的「伙伴」。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_relate": [
+          {"source": "基尼奇", "target": "商队"}
+        ],
+        "acceptable_types": ["WORKS_WITH", "HIRED_BY", "COMMISSIONED_BY"]
+      }
+    },
+    {
+      "id": "rel_011",
+      "layer": "inferred",
+      "difficulty": "hard",
+      "description": "敌对关系推断",
+      "input": {
+        "text": "恰斯卡：因为在战争结束后不久，英雄们的旧友奥奇坎就成了纳塔的暴君。他仇视龙众的一切，也迫害保护龙众的人们。\n\n恰斯卡：就连他曾经的盟友伊葵…也在其列。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_relate": [
+          {"source": "奥奇坎", "target": "伊葵"}
+        ],
+        "acceptable_types": ["ENEMY_OF", "OPPOSED_TO", "PERSECUTED"],
+        "may_relate": [
+          {"source": "奥奇坎", "target": "六英杰", "note": "前友后敌"}
+        ],
+        "notes": "复杂的历史关系，从朋友变成迫害者"
+      }
+    },
+    {
+      "id": "rel_012",
+      "layer": "inferred",
+      "difficulty": "hard",
+      "description": "势力冲突关系",
+      "input": {
+        "text": "卓新：他们最近在挪德卡莱做了不少大动作，和本地的教团起了许多摩擦。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_relate": [
+          {"source": "愚人众", "target": "霜月之子"}
+        ],
+        "acceptable_types": ["ENEMY_OF", "CONFLICTS_WITH", "OPPOSED_TO"],
+        "notes": "'摩擦'暗示冲突但不一定是敌对"
+      }
+    },
+    {
+      "id": "rel_013",
+      "layer": "inferred",
+      "difficulty": "hard",
+      "description": "历史友谊关系",
+      "input": {
+        "text": "恰斯卡：还有一部分，被她的朋友保存了下来——也就是织卷上的另一位…",
+        "context": "伊葵的研究被莉安歌保存",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_relate": [
+          {"source": "伊葵", "target": "莉安歌"}
+        ],
+        "acceptable_types": ["FRIEND_OF", "ALLY_OF"],
+        "bidirectional": true
+      }
+    },
+    {
+      "id": "rel_014",
+      "layer": "explicit",
+      "difficulty": "medium",
+      "description": "认识关系",
+      "input": {
+        "text": "伊法：「杜麦尼」？派蒙？好久不见。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_relate": [
+          {"source": "伊法", "target": "派蒙"}
+        ],
+        "should_relate": [
+          {"source": "伊法", "target": "旅行者"}
+        ],
+        "acceptable_types": ["KNOWS", "FRIEND_OF"]
+      }
+    },
+    {
+      "id": "rel_015",
+      "layer": "explicit",
+      "difficulty": "medium",
+      "description": "家庭关系",
+      "input": {
+        "text": "卓新：这两位是我的妻女…",
+        "entities_context": ["卓新", "艾慕", "爱莱妲"],
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_relate": [
+          {"source": "艾慕", "target": "卓新"},
+          {"source": "爱莱妲", "target": "卓新"}
+        ],
+        "acceptable_types": ["FAMILY_OF", "RELATED_TO", "SPOUSE_OF", "CHILD_OF"],
+        "notes": "家庭关系明确，具体类型可灵活"
+      }
+    },
+    {
+      "id": "rel_016",
+      "layer": "constraint",
+      "difficulty": "medium",
+      "description": "整章关系约束",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "full_chapter": true
+      },
+      "constraints": {
+        "min_relationships": 10,
+        "must_have_relationship_types": ["KNOWS", "MEMBER_OF"],
+        "should_have_relationship_types": ["FRIEND_OF", "WORKS_WITH"],
+        "all_characters_connected": true,
+        "no_orphan_characters": true,
+        "notes": "章节中所有主要角色应该通过某种关系连接"
+      }
+    },
+    {
+      "id": "rel_017",
+      "layer": "constraint",
+      "difficulty": "hard",
+      "description": "增量关系约束",
+      "input": {
+        "precondition": {
+          "existing_relationships": [
+            {"source": "恰斯卡", "target": "花羽会", "type": "MEMBER_OF"},
+            {"source": "派蒙", "target": "旅行者", "type": "PARTNER_OF"}
+          ]
+        },
+        "new_text": "基尼奇：我听伊法说，你们送了一个机关人偶来回声之子",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_add_relationship": [
+          {"source": "基尼奇", "target": "伊法"}
+        ],
+        "must_not_duplicate_relationship": true,
+        "may_link_to_existing": ["伊法", "回声之子"],
+        "notes": "增量时应添加新关系，不重复已有关系"
+      }
+    },
+    {
+      "id": "rel_018",
+      "layer": "negative",
+      "difficulty": "medium",
+      "description": "防幻觉 - 不应存在的关系",
+      "input": {
+        "text": "派蒙：嘿嘿，去回声之子——找万能的希诺宁！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_not_relate": [
+          {"source": "派蒙", "target": "回声之子", "type": "MEMBER_OF"},
+          {"source": "希诺宁", "target": "花羽会", "type": "MEMBER_OF"}
+        ],
+        "notes": "派蒙不是回声之子成员，希诺宁不是花羽会成员"
+      }
+    },
+    {
+      "id": "rel_019",
+      "layer": "negative",
+      "difficulty": "hard",
+      "description": "防幻觉 - 无证据的关系",
+      "input": {
+        "text": "恰斯卡：就在附近的海滩上，还是那些家伙干的…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_not_relate": [
+          {"source": "恰斯卡", "target": "秘源机兵", "type": "FRIEND_OF"},
+          {"source": "恰斯卡", "target": "秘源机兵", "type": "MEMBER_OF"}
+        ],
+        "notes": "不能从敌对语境推断出正面关系"
+      }
+    },
+    {
+      "id": "rel_020",
+      "layer": "alias",
+      "difficulty": "medium",
+      "description": "别名关系",
+      "input": {
+        "text": "恰斯卡：嗯，派蒙？还有我们的「杜麦尼」？",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_relate": [
+          {"source": "杜麦尼", "target": "旅行者"}
+        ],
+        "acceptable_types": ["IS_ALIAS_OF", "SAME_AS", "REFERS_TO"],
+        "notes": "别名关系的方向：别名 -> 正式名"
+      }
+    }
+  ]
+}

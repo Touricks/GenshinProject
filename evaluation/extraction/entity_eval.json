@@ -1,0 +1,413 @@
+{
+  "version": "2.0",
+  "description": "实体提取测试集 - 基于约束的评估方式",
+  "created_at": "2026-01-29",
+  "philosophy": "启发式系统评估：测试约束和不变量，而非精确匹配",
+  "test_types": {
+    "must_extract": "必须提取到的实体（高确定性）",
+    "should_extract": "应该提取到的实体（中确定性，未提取不扣分）",
+    "must_not_extract": "不应该出现的实体（防止幻觉）",
+    "constraint": "满足约束条件即可"
+  },
+  "evaluation_layers": {
+    "parsing": {"certainty": "high", "auto_test": true},
+    "entity": {"certainty": "medium", "auto_test": true},
+    "property": {"certainty": "low", "manual_review": true}
+  },
+  "items": [
+    {
+      "id": "entity_001",
+      "layer": "parsing",
+      "difficulty": "easy",
+      "description": "对话格式角色提取 - 说话者必须被识别",
+      "input": {
+        "text": "伊法：…伤口已经处理完了。\n\n恰斯卡：就在附近的海滩上。\n\n派蒙：——嘿！恰斯卡！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["伊法", "恰斯卡", "派蒙"],
+        "must_not_extract": ["玛薇卡", "基尼奇"],
+        "min_entity_count": 3
+      }
+    },
+    {
+      "id": "entity_002",
+      "layer": "parsing",
+      "difficulty": "easy",
+      "description": "玩家角色识别",
+      "input": {
+        "text": "玩家：伊法刚才是在「看病」吗？\n\n伊法：嗯，好在恰斯卡送医及时。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["玩家", "伊法"],
+        "should_extract": ["恰斯卡"],
+        "notes": "恰斯卡被提及但未说话，提取与否都合理"
+      }
+    },
+    {
+      "id": "entity_003",
+      "layer": "parsing",
+      "difficulty": "medium",
+      "description": "匿名角色（？？？）处理",
+      "input": {
+        "text": "？？？：稍早之前…\n\n？？？：…在哪里…\n\n小机器人：滴…滴…嘟…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["？？？", "小机器人"],
+        "entity_count_range": [2, 3],
+        "notes": "？？？可作为单一实体或占位符处理"
+      }
+    },
+    {
+      "id": "entity_004",
+      "layer": "parsing",
+      "difficulty": "medium",
+      "description": "非人类说话者",
+      "input": {
+        "text": "受伤的绒翼龙：啁——\n\n咔库库：没完没了！哥们！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["受伤的绒翼龙", "咔库库"],
+        "allowed_types": ["Character", "Creature", "Entity"]
+      }
+    },
+    {
+      "id": "entity_005",
+      "layer": "parsing",
+      "difficulty": "hard",
+      "description": "特殊实体（诅咒）",
+      "input": {
+        "text": "黑雾诅咒：——「悖谬」。\n\n黑雾诅咒：此非正途。此非归处。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["黑雾诅咒"],
+        "allowed_types": ["Character", "Entity", "System"],
+        "notes": "非常规说话者，但格式一致，必须识别"
+      }
+    },
+    {
+      "id": "entity_006",
+      "layer": "entity",
+      "difficulty": "easy",
+      "description": "直接介绍的角色",
+      "input": {
+        "text": "恰斯卡：这位是我们部族的「医生」伊法…和他的助理咔库库。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["伊法", "咔库库"],
+        "should_extract": ["恰斯卡"],
+        "should_have_property": {
+          "伊法": ["role"],
+          "咔库库": ["role"]
+        },
+        "notes": "角色属性（医生、助理）如能提取更好，但非必须"
+      }
+    },
+    {
+      "id": "entity_007",
+      "layer": "entity",
+      "difficulty": "easy",
+      "description": "组织名提取（书名号标记）",
+      "input": {
+        "text": "恰斯卡：——要不就先留在「花羽会」里？我们欢迎所有远道而来的客人。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["花羽会"],
+        "expected_type": "Organization",
+        "type_flexibility": true
+      }
+    },
+    {
+      "id": "entity_008",
+      "layer": "entity",
+      "difficulty": "easy",
+      "description": "组织名提取（回声之子）",
+      "input": {
+        "text": "派蒙：嘿嘿，去回声之子——找万能的希诺宁！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["回声之子"],
+        "should_extract": ["希诺宁"],
+        "expected_type": "Organization"
+      }
+    },
+    {
+      "id": "entity_009",
+      "layer": "entity",
+      "difficulty": "medium",
+      "description": "地点名提取",
+      "input": {
+        "text": "派蒙：况且我们再过不久，就要出发去挪德卡莱了吧？\n\n卓新：挪德卡莱…是一处流浪之地，汇集了来自各国的人。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["挪德卡莱"],
+        "should_extract": ["卓新", "派蒙"],
+        "expected_type": "Location"
+      }
+    },
+    {
+      "id": "entity_010",
+      "layer": "entity",
+      "difficulty": "medium",
+      "description": "子地点提取",
+      "input": {
+        "text": "阿西木：我们之前都是在挪德卡莱的「那夏镇」讨生活的商贩",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["那夏镇"],
+        "should_extract": ["挪德卡莱", "阿西木"],
+        "expected_type": "Location"
+      }
+    },
+    {
+      "id": "entity_011",
+      "layer": "entity",
+      "difficulty": "medium",
+      "description": "国家/大区提取",
+      "input": {
+        "text": "希诺宁：纳塔的核心、枫丹的关节、蒙德的发饰…她看起来不属于任何一个国家。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract_any": [["纳塔", "枫丹", "蒙德"]],
+        "min_location_count": 2,
+        "notes": "至少识别出2个以上国家名"
+      }
+    },
+    {
+      "id": "entity_012",
+      "layer": "entity",
+      "difficulty": "medium",
+      "description": "势力/派系提取",
+      "input": {
+        "text": "卓新：嗯…是从北边来的愚人众。\n\n卓新：他们最近在挪德卡莱做了不少大动作，和本地的教团起了许多摩擦。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["愚人众"],
+        "should_extract": ["挪德卡莱"],
+        "may_extract": ["教团", "霜月之子"],
+        "notes": "教团指代霜月之子，能识别出任一即可"
+      }
+    },
+    {
+      "id": "entity_013",
+      "layer": "entity",
+      "difficulty": "hard",
+      "description": "历史人物提取",
+      "input": {
+        "text": "希诺宁：那可不是我亲戚…她是回声之子的先祖，纳塔最初的「六英杰」之一，「祝福」的伊葵。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["伊葵"],
+        "should_extract": ["六英杰", "回声之子"],
+        "may_have_property": {
+          "伊葵": ["title", "affiliation", "historical"]
+        }
+      }
+    },
+    {
+      "id": "entity_014",
+      "layer": "entity",
+      "difficulty": "hard",
+      "description": "历史人物莉安歌",
+      "input": {
+        "text": "恰斯卡：传说中被龙的主母养育长大，创下花羽会，令弱小之人与被逐之龙都得享自由的无冕王女…\n\n恰斯卡：——莉安歌。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["莉安歌"],
+        "should_extract": ["花羽会"],
+        "may_extract": ["龙的主母"],
+        "may_have_property": {
+          "莉安歌": ["title", "achievement"]
+        }
+      }
+    },
+    {
+      "id": "entity_015",
+      "layer": "entity",
+      "difficulty": "hard",
+      "description": "暴君角色提取",
+      "input": {
+        "text": "恰斯卡：因为在战争结束后不久，英雄们的旧友奥奇坎就成了纳塔的暴君。他仇视龙众的一切，也迫害保护龙众的人们。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["奥奇坎"],
+        "should_extract": ["纳塔"],
+        "may_have_property": {
+          "奥奇坎": ["role", "historical"]
+        }
+      }
+    },
+    {
+      "id": "entity_016",
+      "layer": "entity",
+      "difficulty": "medium",
+      "description": "商队成员批量提取",
+      "input": {
+        "text": "卓新：抱歉…忘了自我介绍——我叫卓新，是一名商人，这两位是我的妻女…\n\n爱莱妲：伊涅芙姐姐！\n\n艾慕：伊涅芙！总算找到你了…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["卓新", "爱莱妲", "艾慕"],
+        "should_extract": ["伊涅芙"],
+        "min_character_count": 3
+      }
+    },
+    {
+      "id": "entity_017",
+      "layer": "entity",
+      "difficulty": "medium",
+      "description": "主角组合提取",
+      "input": {
+        "text": "基尼奇：那我去联络其他能帮上忙的人了。「杜麦尼」，派蒙，再会。\n\n派蒙：再见！基尼奇——啊，还有阿乔！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["基尼奇", "派蒙"],
+        "should_extract": ["阿乔"],
+        "may_extract": ["杜麦尼", "旅行者"],
+        "notes": "杜麦尼和旅行者是同一实体的别名"
+      }
+    },
+    {
+      "id": "entity_018",
+      "layer": "entity",
+      "difficulty": "easy",
+      "description": "龙伙伴提取",
+      "input": {
+        "text": "阿乔：哇——什么声音那么大！是打雷了吗？\n\n基尼奇：…真打雷的话，我会先把你往天上扔。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["阿乔", "基尼奇"],
+        "entity_count_range": [2, 3]
+      }
+    },
+    {
+      "id": "entity_019",
+      "layer": "entity",
+      "difficulty": "medium",
+      "description": "反派角色提取",
+      "input": {
+        "text": "维李米尔：…哼。\n\n「木偶」：…纳塔的古龙文明？呵…\n\n「木偶」：想去折腾就随你们吧，不过要记得留意一个「变数」…",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["维李米尔", "「木偶」"],
+        "notes": "带括号的名称应保留括号"
+      }
+    },
+    {
+      "id": "entity_020",
+      "layer": "entity",
+      "difficulty": "medium",
+      "description": "制造者提取（回忆场景）",
+      "input": {
+        "text": "埃德恩：不敢不敢！我们哪有那能耐，她是爱诺造出来的…\n\n爱诺：…从今天起你就叫「伊涅芙」啦！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["爱诺"],
+        "should_extract": ["埃德恩", "伊涅芙"]
+      }
+    },
+    {
+      "id": "entity_021",
+      "layer": "property",
+      "difficulty": "hard",
+      "description": "事件提取 - 袭击事件",
+      "input": {
+        "text": "恰斯卡：她是被「秘源机兵」给袭击了。还好我就在附近巡逻，顺手收拾了那些古董。",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["秘源机兵"],
+        "may_extract_event": true,
+        "event_hints": ["袭击"],
+        "notes": "事件提取是可选的高级功能，提取出来算加分"
+      }
+    },
+    {
+      "id": "entity_022",
+      "layer": "property",
+      "difficulty": "hard",
+      "description": "事件提取 - 月亮事件",
+      "input": {
+        "text": "阿西木：岂止是摩擦！我还听说…他们把「月亮」都给拉下来了！\n\n埃德恩：「月亮」…还有那些「月神像」的事…「霜月之子」肯定不会善罢甘休吧？",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_extract": ["霜月之子"],
+        "should_extract": ["阿西木", "埃德恩"],
+        "may_extract_event": true,
+        "notes": "月亮坠落事件如能提取为Event类型是加分项"
+      }
+    },
+    {
+      "id": "entity_023",
+      "layer": "property",
+      "difficulty": "hard",
+      "description": "事件提取 - 历史事件",
+      "input": {
+        "text": "希诺宁：她与伙伴们一同踏上了讨伐火龙王的旅途，拆解了无数古代龙众制造的机关",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "should_extract": ["火龙王"],
+        "may_extract": ["古代龙众"],
+        "may_extract_event": true,
+        "notes": "历史事件提取难度高，不强制要求"
+      }
+    },
+    {
+      "id": "entity_024",
+      "layer": "constraint",
+      "difficulty": "medium",
+      "description": "整章实体提取约束",
+      "input": {
+        "source_file": "Data/1600/chapter0_dialogue.txt",
+        "full_chapter": true
+      },
+      "constraints": {
+        "min_characters": 15,
+        "min_organizations": 3,
+        "min_locations": 2,
+        "must_include_characters": ["恰斯卡", "派蒙", "希诺宁", "基尼奇", "伊涅芙"],
+        "must_include_organizations": ["花羽会", "回声之子"],
+        "no_duplicate_entities": true
+      }
+    },
+    {
+      "id": "entity_025",
+      "layer": "constraint",
+      "difficulty": "hard",
+      "description": "增量提取约束",
+      "input": {
+        "precondition": {
+          "existing_characters": ["恰斯卡", "派蒙", "伊法"]
+        },
+        "new_text": "基尼奇：我听伊法说，你们送了一个机关人偶来回声之子\n\n阿乔：哇——什么声音那么大！",
+        "source_file": "Data/1600/chapter0_dialogue.txt"
+      },
+      "constraints": {
+        "must_add_new": ["基尼奇", "阿乔"],
+        "must_not_duplicate": ["伊法"],
+        "should_link_existing": ["伊法"],
+        "notes": "增量时不应重复已有实体，应链接到现有实体"
+      }
+    }
+  ]
+}
