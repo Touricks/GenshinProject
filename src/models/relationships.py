@@ -49,6 +49,8 @@ class Relationship:
     target: str
     rel_type: RelationType
     properties: Dict[str, Any] = field(default_factory=dict)
+    chapter: Optional[int] = None
+    task_id: Optional[str] = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary for Neo4j."""
@@ -57,6 +59,8 @@ class Relationship:
             "target": self.target,
             "type": self.rel_type.value,
             "properties": self.properties,
+            "chapter": self.chapter,
+            "task_id": self.task_id,
         }
 
 

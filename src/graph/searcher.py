@@ -149,16 +149,50 @@ class GraphSearcher:
             "count": len(results),
         }
 
+    def _resolve_canonical_name(self, entity_name: str) -> str:
+        """
+        Resolve an entity name (or alias) to its canonical name using the fulltext index.
+        Prioritizes nodes with populated aliases (Seed Characters) over raw extracted nodes.
+        """
+        # Try fulltext search on Character index (ADR-006)
+        query = """
+            CALL db.index.fulltext.queryNodes("entity_alias_index", $name) 
+            YIELD node, score 
+            RETURN node.name as name, node.aliases as aliases, score 
+            LIMIT 5
+        """
+        try:
+            results = self.conn.execute(query, {"name": entity_name})
+            
+            # Strategy: Prefer nodes that have aliases (implies Seed/Main Character)
+            # 1. Look for match with aliases
+            for res in results:
+                if res.get("aliases") and len(res["aliases"]) > 0:
+                     return res["name"]
+            
+            # 2. Fallback to top score
+            if results and results[0]["score"] > 0.0:
+                return results[0]["name"]
+                
+        except Exception:
+            # Index might not exist or other error, fallback
+            pass
+            
+        return entity_name
+
     def _search_all_relations(self, entity: str, limit: int) -> List[Dict[str, Any]]:
         """Search for all relationships of an entity."""
+        canonical_name = self._resolve_canonical_name(entity)
         query = self.QUERY_TEMPLATES["all_relations"]
-        return self.conn.execute(query, {"entity": entity, "limit": limit})
+        return self.conn.execute(query, {"entity": canonical_name, "limit": limit})
 
     def _search_specific_relation(
         self, entity: str, relation: str, limit: int
     ) -> List[Dict[str, Any]]:
         """Search for specific relationship type."""
-        # Build query dynamically since we can't parameterize relationship types
+        canonical_name = self._resolve_canonical_name(entity)
+        
+        # Build query dynamically
         query = f"""
             MATCH (a {{name: $entity}})-[r:{relation}]-(b)
             RETURN
@@ -170,7 +204,46 @@ class GraphSearcher:
                 properties(r) as rel_properties
             LIMIT $limit
         """
-        return self.conn.execute(query, {"entity": entity, "limit": limit})
+        return self.conn.execute(query, {"entity": canonical_name, "limit": limit})
+        
+    def search_history(
+        self, entity: str, target: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve relationship history (temporal evolution) for an entity.
+        
+        Args:
+            entity: The main entity to track
+            target: Optional target entity to filter history with
+            
+        Returns:
+            List of relationship events sorted by time.
+        """
+        canonical_source = self._resolve_canonical_name(entity)
+        canonical_target = self._resolve_canonical_name(target) if target else None
+        
+        filters = "WHERE a.name = $source"
+        if canonical_target:
+            filters += " AND b.name = $target"
+            
+        query = f"""
+            MATCH (a)-[r]->(b)
+            {filters}
+            RETURN 
+                a.name as source,
+                b.name as target,
+                type(r) as relation,
+                r.chapter as chapter,
+                r.task_id as task_id,
+                r.evidence as evidence
+            ORDER BY r.chapter ASC, r.task_id ASC
+        """
+        
+        params = {"source": canonical_source}
+        if canonical_target:
+            params["target"] = canonical_target
+            
+        return self.conn.execute(query, params)
 
     def get_organization_members(self, org_name: str) -> List[Dict[str, Any]]:
         """

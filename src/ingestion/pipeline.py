@@ -318,15 +318,8 @@ class IncrementalIngestionPipeline(IngestionPipeline):
         )
 
     def _find_all_files(self) -> List[Path]:
-        """Find all dialogue files in data directory."""
-        all_files = []
-        task_dirs = sorted(
-            [d for d in self.data_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
-        )
-        for task_dir in task_dirs:
-            chapter_files = sorted(task_dir.glob("chapter*_dialogue.txt"))
-            all_files.extend(chapter_files)
-        return all_files
+        """Find all dialogue files in data directory (recursive)."""
+        return sorted(self.data_dir.rglob("chapter*_dialogue.txt"))
 
     def get_changed_files(self) -> List[Path]:
         """Get list of new or modified files."""

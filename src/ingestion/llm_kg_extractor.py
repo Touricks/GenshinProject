@@ -14,8 +14,11 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 # Load .env from src directory
-env_path = Path(__file__).parent.parent / ".env"
+env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(env_path)
+print(f"DEBUG: Loading .env from {env_path}")
+print(f"DEBUG: GOOGLE_API_KEY present: {'GOOGLE_API_KEY' in os.environ}")
+print(f"DEBUG: GEMINI_API_KEY present: {'GEMINI_API_KEY' in os.environ}")
 
 
 # =============================================================================
@@ -56,6 +59,10 @@ class ExtractedRelationship(BaseModel):
     description: Optional[str] = Field(
         default=None,
         description="关系描述/文本证据"
+    )
+    evidence: Optional[str] = Field(
+        default=None,
+        description="支持该关系的原文引用/文本片段"
     )
 
 
@@ -144,6 +151,10 @@ EXTRACTION_PROMPT = """你是一个原神（Genshin Impact）剧情文本分析�
 
 ## 对话文本
 {text}
+
+4. **文本证据(evidence)**：
+   - 对于每个关系，提取一段支持该关系的原文片段（quote）。
+   - 如果是推理得出的关系，引用相关的对话上下文。
 
 请输出严格的JSON格式。
 """

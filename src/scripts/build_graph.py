@@ -85,12 +85,7 @@ def build_graph(
             return
 
         # Get all dialogue files
-        dialogue_files = []
-        for task_dir in sorted(data_path.iterdir()):
-            if not task_dir.is_dir():
-                continue
-            for chapter_file in sorted(task_dir.glob("chapter*_dialogue.txt")):
-                dialogue_files.append(chapter_file)
+        dialogue_files = sorted(data_path.rglob("chapter*_dialogue.txt"))
 
         print(f"Found {len(dialogue_files)} dialogue files")
 
@@ -104,6 +99,20 @@ def build_graph(
                 # 1. Parse Metadata using EntityExtractor (regex fast path)
                 # We extract using extract_from_file but primarily use the metadata
                 regex_result = metadata_extractor.extract_from_file(file_path)
+                
+                # Global Timeline Logic (ADR-007 + Folder Strategy)
+                # Calculate global chapter from Folder ID and Chapter Number
+                try:
+                    folder_id = int(file_path.parent.name)
+                    local_chapter = regex_result.metadata.chapter_number or 0
+                    global_chapter = folder_id * 100 + local_chapter
+                    
+                    # Override metadata with global sequence
+                    regex_result.metadata.chapter_number = global_chapter
+                    regex_result.metadata.task_id = str(folder_id) # Ensure task context is folder ID
+                except ValueError:
+                     # Fallback for non-numeric folders (e.g. "Lore", "Backup")
+                    pass
                 
                 # 2. Extract Knowledge Graph using LLM (smart slow path)
                 try:
@@ -140,7 +149,12 @@ def build_graph(
                             source=rel.source,
                             target=rel.target,
                             rel_type=rel_type_enum,
-                            properties={"description": rel.description} if rel.description else {}
+                            properties={
+                                "description": rel.description,
+                                "evidence": rel.evidence
+                            },
+                            chapter=regex_result.metadata.chapter_number,
+                            task_id=regex_result.metadata.task_id
                         )
                         all_relationships.append(new_rel)
                     except ValueError:
@@ -154,10 +168,11 @@ def build_graph(
         print(f"Total extracted relationships: {len(all_relationships)}")
 
         # Deduplicate relationships
+        # Key: (source, target, type, chapter) to allow temporal evolution
         seen = set()
         unique_relationships = []
         for rel in all_relationships:
-            key = (rel.source, rel.target, rel.rel_type)
+            key = (rel.source, rel.target, rel.rel_type, rel.chapter)
             if key not in seen:
                 seen.add(key)
                 unique_relationships.append(rel)

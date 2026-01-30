@@ -70,13 +70,13 @@ searcher = GraphSearcher(
 
 | Type | Direction | Description | Properties |
 |------|-----------|-------------|------------|
-| `FRIEND_OF` | bidirectional | Friendship between characters | `strength` |
-| `PARTNER_OF` | bidirectional | Partnership (dragon partner, companion) | `type` |
-| `MEMBER_OF` | Character → Organization | Organizational membership | `role` |
-| `LEADER_OF` | Character → Organization | Leadership position | - |
+| `FRIEND_OF` | bidirectional | Friendship between characters | `strength`, `evidence` |
+| `PARTNER_OF` | bidirectional | Partnership (dragon partner, companion) | `type`, `evidence` |
+| `MEMBER_OF` | Character → Organization | Organizational membership | `role`, `evidence` |
+| `LEADER_OF` | Character → Organization | Leadership position | `evidence` |
 | `MENTIONED_IN` | Character → Chunk | Character appears in text chunk | - |
-| `ENEMY_OF` | bidirectional | Antagonistic relationship | `reason`, `resolved` |
-| `FAMILY_OF` | bidirectional | Family relationship | - |
+| `ENEMY_OF` | bidirectional | Antagonistic relationship | `reason`, `resolved`, `evidence` |
+| `FAMILY_OF` | bidirectional | Family relationship | `evidence` |
 
 ---
 
@@ -85,6 +85,8 @@ searcher = GraphSearcher(
 ### GraphSearcher.search()
 
 **Primary search method for ReAct tool calls.**
+
+*Supports native Alias Resolution: If `entity` matches an alias (e.g., "Scaramouche"), it automatically resolves to the canonical node (e.g., "Wanderer").*
 
 ```python
 def search(
@@ -100,10 +102,39 @@ def search(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `entity` | `str` | required | Entity name to search for |
-| `relation` | `str` | None | Optional relationship type filter (e.g., "FRIEND_OF") |
-| `depth` | `int` | 1 | Search depth (reserved for future use) |
+| `entity` | `str` | required | Entity name (or alias) to search for |
+| `relation` | `str` | None | Optional relationship type filter |
+| `depth` | `int` | 1 | Search depth |
 | `limit` | `int` | 20 | Maximum number of results |
+
+---
+
+### GraphSearcher.search_history()
+
+**Retrieve relationship evolution over time (Temporal Graph).**
+
+```python
+def search_history(
+    self,
+    entity: str,
+    target: Optional[str] = None,
+) -> List[Dict[str, Any]]
+```
+
+**Returns:**
+
+```python
+[
+    {
+        "source": str,      # Canonical source entity
+        "target": str,      # Target entity
+        "relation": str,    # Relationship type at that time
+        "chapter": int,     # Global Chapter ID (e.g., 160701)
+        "evidence": str,    # Evidence text
+    },
+    ...
+]
+```
 
 **Returns:**
 
@@ -491,6 +522,26 @@ ORDER BY co_appearances DESC
 LIMIT 10
 ```
 
+### Querying Relationship Evidence
+ 
+**Retrieve textual evidence supporting a relationship.**
+ 
+Relationship edges (e.g., `FRIEND_OF`, `PARTNER_OF`) contain an `evidence` property with a direct quote or text fragment justifying the connection.
+ 
+```cypher
+MATCH (a:Character)-[r:FRIEND_OF]-(b:Character)
+WHERE r.evidence IS NOT NULL
+RETURN a.name, b.name, r.evidence
+LIMIT 5
+```
+ 
+**Example Output:**
+ 
+| a.name | b.name | r.evidence |
+|--------|--------|------------|
+| 恰斯卡 | 卡齐娜 | "卡齐娜是我的好朋友..." |
+| 基尼奇 | 阿尤 | "我也不是白白养你的..." |
+ 
 ---
 
 ## Related Files

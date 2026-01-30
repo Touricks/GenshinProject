@@ -7,6 +7,7 @@
 .claude/
 .project/
 .devkit/
+.cache/
 docs_internal/
 
 # Data (large files, stored externally)

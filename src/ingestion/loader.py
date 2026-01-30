@@ -27,10 +27,12 @@ class DocumentLoader:
             raise ValueError(f"Data directory not found: {self.data_dir}")
 
     def load_all(self) -> Iterator[RawDocument]:
-        """Load all documents from data directory."""
-        task_dirs = sorted(
-            [d for d in self.data_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
-        )
+        """Load all documents from data directory (recursive)."""
+        # Recursively find all dialogue files
+        dialogue_files = sorted(self.data_dir.rglob("chapter*_dialogue.txt"))
+
+        # Group by parent directory (task folders)
+        task_dirs = sorted(set(f.parent for f in dialogue_files))
         logger.info(f"Found {len(task_dirs)} task directories")
 
         for task_dir in task_dirs:
@@ -167,14 +169,12 @@ class DocumentLoader:
 
 
 def count_files(data_dir: Path) -> dict:
-    """Count files in data directory for statistics."""
-    loader = DocumentLoader(data_dir)
-    stats = {"tasks": 0, "chapters": 0}
+    """Count files in data directory for statistics (recursive)."""
+    data_path = Path(data_dir)
+    chapter_files = list(data_path.rglob("chapter*_dialogue.txt"))
+    task_dirs = set(f.parent for f in chapter_files)
 
-    for task_dir in loader.data_dir.iterdir():
-        if task_dir.is_dir() and not task_dir.name.startswith("."):
-            stats["tasks"] += 1
-            chapter_files = list(task_dir.glob("chapter*_dialogue.txt"))
-            stats["chapters"] += len(chapter_files)
-
-    return stats
+    return {
+        "tasks": len(task_dirs),
+        "chapters": len(chapter_files),
+    }

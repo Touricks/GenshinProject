@@ -63,6 +63,8 @@ class GraphBuilder:
             "CREATE INDEX character_tribe IF NOT EXISTS FOR (c:Character) ON (c.tribe)",
             "CREATE INDEX chunk_event_order IF NOT EXISTS FOR (ch:Chunk) ON (ch.event_order)",
             "CREATE INDEX chunk_task IF NOT EXISTS FOR (ch:Chunk) ON (ch.task_id)",
+            # Fulltext index for alias resolution (ADR-006)
+            "CREATE FULLTEXT INDEX entity_alias_index IF NOT EXISTS FOR (c:Character) ON EACH [c.name, c.aliases]",
         ]
 
         for index in indexes:
@@ -189,7 +191,14 @@ class GraphBuilder:
             relationship: Relationship to create
         """
         # Build property SET clause dynamically
-        props = relationship.properties
+        props = relationship.properties.copy()
+        
+        # Add temporal properties if present
+        if relationship.chapter is not None:
+            props["chapter"] = relationship.chapter
+        if relationship.task_id:
+            props["task_id"] = relationship.task_id
+
         prop_sets = ", ".join([f"r.{k} = ${k}" for k in props.keys()])
 
         # Determine source and target labels based on relationship type
@@ -197,13 +206,24 @@ class GraphBuilder:
             relationship.rel_type
         )
 
-        query = f"""
-        MATCH (a:{source_label} {{name: $source}})
-        MATCH (b:{target_label} {{name: $target}})
-        MERGE (a)-[r:{relationship.rel_type.value}]->(b)
-        {"SET " + prop_sets if prop_sets else ""}
-        RETURN type(r) as rel_type
-        """
+        if "chapter" in props:
+             # Temporal relationship: unique by type AND chapter
+            query = f"""
+            MATCH (a:{source_label} {{name: $source}})
+            MATCH (b:{target_label} {{name: $target}})
+            MERGE (a)-[r:{relationship.rel_type.value} {{chapter: $chapter}}]->(b)
+            {"SET " + prop_sets if prop_sets else ""}
+            RETURN type(r) as rel_type
+            """
+        else:
+            # Static relationship: unique by type only
+            query = f"""
+            MATCH (a:{source_label} {{name: $source}})
+            MATCH (b:{target_label} {{name: $target}})
+            MERGE (a)-[r:{relationship.rel_type.value}]->(b)
+            {"SET " + prop_sets if prop_sets else ""}
+            RETURN type(r) as rel_type
+            """
 
         params = {"source": relationship.source, "target": relationship.target, **props}
 
