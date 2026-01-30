@@ -5,10 +5,13 @@
 这是**唯一**返回故事原文的工具。
 """
 
+import logging
 from typing import Optional
 
 from ..ingestion.indexer import VectorIndexer
 from ..ingestion.embedder import EmbeddingGenerator
+
+logger = logging.getLogger(__name__)
 
 
 # 模块级单例，避免每次调用时重新加载模型
@@ -61,6 +64,11 @@ def search_memory(
         带有章节/来源引用的故事文本片段。
         每个片段包含实际的对话或叙述内容。
     """
+    logger.info(
+        f"[Qdrant] search_memory: query={query[:50]}{'...' if len(query) > 50 else ''}, "
+        f"characters={characters}, sort_by={sort_by}, limit={limit}"
+    )
+
     embedder = _get_embedder()
     indexer = _get_indexer()
 
@@ -79,6 +87,8 @@ def search_memory(
         filter_conditions=filter_conditions,
         sort_by=sort_by,
     )
+
+    logger.debug(f"[Qdrant] search_memory result: {len(results)} chunks found")
 
     if not results:
         msg = f"未找到与查询 '{query}' 相关的故事内容"

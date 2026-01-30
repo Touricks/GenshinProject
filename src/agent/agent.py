@@ -11,20 +11,20 @@ Features:
 
 import logging
 import os
+import time
 from typing import Optional, List, Tuple
 
 from ..config import Settings
 from .prompts import SYSTEM_PROMPT
+from .tracer import AgentTracer
 
 logger = logging.getLogger(__name__)
 
-# Progressive limit expansion for search_memory
+# Progressive limit expansion for search_memory (3 rounds)
 LIMIT_PROGRESSION = {
-    1: 5,   # 第1次：默认 limit=5
-    2: 8,   # 第2次：扩大到 8
-    3: 12,  # 第3次：扩大到 12
-    4: 15,  # 第4次：扩大到 15
-    5: 20,  # 第5次：最大 20
+    1: 5,   # 第1轮
+    2: 8,   # 第2轮
+    3: 12,  # 第3轮
 }
 
 
@@ -81,7 +81,10 @@ class GenshinRetrievalAgent:
         self._memory = None
         self._llm = None
         self._grader = None
+        self._grader_llm = None  # Separate fast LLM for grader/refiner
+        self._refiner = None
         self._current_limit = 5  # Default limit for search_memory
+        self._tracer = AgentTracer()  # Full chain tracer for debugging
 
     def _ensure_initialized(self):
         """Ensure the agent is initialized (lazy loading)."""
@@ -171,10 +174,21 @@ class GenshinRetrievalAgent:
         # Initialize Context for multi-turn
         self._ctx = Context(self._agent)
 
-        # Initialize Grader if enabled
+        # Initialize Grader and Refiner with fast LLM if enabled
         if self.enable_grader:
             from .grader import AnswerGrader
-            self._grader = AnswerGrader(self._llm)
+            from .refiner import QueryRefiner
+
+            # Use a separate fast LLM for grader/refiner (speed priority)
+            self._grader_llm = GoogleGenAI(
+                model=self.settings.GRADER_MODEL,  # gemini-2.5-flash by default
+                is_function_calling_model=False,
+            )
+            logger.info(f"Grader/Refiner using fast model: {self.settings.GRADER_MODEL}")
+
+            self._grader = AnswerGrader(self._grader_llm)
+            # Refiner 使用主模型（需要强推理能力）
+            self._refiner = QueryRefiner(self._llm)
 
         logger.info("GenshinRetrievalAgent initialized successfully (ReActAgent mode)")
 
@@ -253,7 +267,7 @@ class GenshinRetrievalAgent:
     async def chat_with_grading(
         self,
         query: str,
-        max_retries: int = 5,
+        max_retries: int = 3,
     ) -> Tuple[str, List[dict]]:
         """
         Run a chat query with Hard Grader evaluation.
@@ -266,7 +280,7 @@ class GenshinRetrievalAgent:
 
         Args:
             query: User question.
-            max_retries: Maximum number of retry attempts (default: 5).
+            max_retries: Maximum number of retry attempts (default: 2).
 
         Returns:
             Tuple of (final_answer, grading_history)
@@ -277,11 +291,21 @@ class GenshinRetrievalAgent:
             logger.warning("Grader not enabled, falling back to simple chat")
             return await self.chat(query), []
 
-        from llama_index.core.agent.workflow import ToolCallResult
+        from llama_index.core.agent.workflow import ToolCallResult, AgentStream
+
+        # Start trace
+        start_time = time.time()
+        self._tracer.start_trace(query, {
+            "agent_model": self.model,
+            "grader_model": self.settings.GRADER_MODEL,
+            "max_retries": max_retries,
+        })
 
         grading_history = []
         current_query = query
         tool_calls_history = []
+        answer = ""
+        passed = False
 
         for attempt in range(1, max_retries + 1):
             # Set progressive limit
@@ -290,28 +314,54 @@ class GenshinRetrievalAgent:
 
             logger.info(f"Attempt {attempt}/{max_retries} with limit={current_limit}")
 
+            # Start attempt trace
+            self._tracer.start_attempt(attempt, current_limit)
+
             # Run ReAct agent
             handler = self._agent.run(current_query, ctx=self._ctx)
 
-            # Collect tool calls
+            # Collect tool calls and reasoning stream
             attempt_tool_calls = []
             async for event in handler.stream_events():
                 if isinstance(event, ToolCallResult):
+                    tool_output = str(event.tool_output)
                     attempt_tool_calls.append({
                         "tool": event.tool_name,
                         "kwargs": event.tool_kwargs,
-                        "output": str(event.tool_output)[:500],
+                        "output": tool_output[:500],
                     })
+                    # Log tool call to tracer
+                    self._tracer.log_tool_call(
+                        tool=event.tool_name,
+                        input_data=event.tool_kwargs,
+                        output=tool_output,
+                    )
+                elif isinstance(event, AgentStream):
+                    # Log reasoning stream
+                    self._tracer.log_reasoning_stream(event.delta)
 
             response = await handler
             answer = str(response)
             tool_calls_history.extend(attempt_tool_calls)
 
             # Grade the answer
+            grade_start = time.time()
             grade_result = await self._grader.grade(
                 question=query,
                 answer=answer,
                 tool_calls=attempt_tool_calls,
+            )
+            grade_duration = int((time.time() - grade_start) * 1000)
+
+            # Log grading to tracer
+            self._tracer.log_grading(
+                input_data={
+                    "question": query,
+                    "answer": answer,
+                    "tool_calls": attempt_tool_calls,
+                },
+                output=grade_result,
+                duration_ms=grade_duration,
             )
 
             grading_history.append({
@@ -334,25 +384,65 @@ class GenshinRetrievalAgent:
                 + (f" ({fail_reason})" if fail_reason else "")
             )
 
+            # End attempt trace
+            self._tracer.end_attempt(answer)
+
             # Check if passed (uses hard threshold logic from grader)
             if passed:
                 logger.info(f"Passed grading on attempt {attempt}")
-                return answer, grading_history
+                break
 
-            # Prepare for retry with suggestions
+            # Prepare for retry with Refiner suggestions
             if attempt < max_retries:
                 suggestion = grade_result.get("suggestion", "请提供更详细的答案")
-                next_limit = LIMIT_PROGRESSION.get(attempt + 1, 20)
-                current_query = (
-                    f"{query}\n\n"
-                    f"[系统提示: 上次答案不完整 (尝试 {attempt}/{max_retries}). "
-                    f"改进建议: {suggestion}. "
-                    f"已扩大搜索范围到 limit={next_limit}]"
-                )
+
+                # Use Refiner to decompose the query
+                refined_queries = []
+                if self._refiner:
+                    try:
+                        refiner_start = time.time()
+                        refined_queries = await self._refiner.refine(query, suggestion)
+                        refiner_duration = int((time.time() - refiner_start) * 1000)
+                        logger.info(f"Refiner generated queries: {refined_queries}")
+
+                        # Log refiner to tracer
+                        self._tracer.log_refiner(
+                            question=query,
+                            suggestion=suggestion,
+                            queries=refined_queries,
+                            duration_ms=refiner_duration,
+                        )
+                    except Exception as e:
+                        logger.warning(f"Refiner failed: {e}")
+
+                # Build retry prompt with Refiner suggestions (pure hint injection)
+                if refined_queries:
+                    queries_hint = ", ".join(f'"{q}"' for q in refined_queries)
+                    current_query = (
+                        f"{query}\n\n"
+                        f"[系统提示: 上次答案深度不足。建议搜索关键词: {queries_hint}。\n"
+                        f"可以使用 search_memory 搜索故事内容，track_journey 追踪时间线，"
+                        f"或 find_connection 查找关系。请根据问题类型选择合适的工具。]"
+                    )
+                else:
+                    current_query = (
+                        f"{query}\n\n"
+                        f"[系统提示: 上次答案不完整 (尝试 {attempt}/{max_retries}). "
+                        f"改进建议: {suggestion}]"
+                    )
+
                 # Reset context for fresh attempt
                 self.reset_context()
 
-        logger.warning(f"Max retries ({max_retries}) reached, returning last answer")
+        # End trace and save to file
+        total_duration = int((time.time() - start_time) * 1000)
+        trace_path = self._tracer.end_trace(answer, passed, total_duration)
+        if trace_path:
+            logger.info(f"Trace saved: {trace_path}")
+
+        if not passed:
+            logger.warning(f"Max retries ({max_retries}) reached, returning last answer")
+
         return answer, grading_history
 
     def reset_context(self):

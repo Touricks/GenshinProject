@@ -12,8 +12,10 @@ from typing import List, Dict, Any
 logger = logging.getLogger(__name__)
 
 # 硬性门槛配置
-DEPTH_HARD_THRESHOLD = 10  # depth 分数必须 >= 10，否则直接不通过
-SCORE_THRESHOLD = 70       # 总分阈值
+DEPTH_HARD_THRESHOLD = 10     # depth 分数必须 >= 10，否则直接不通过
+CITATION_HARD_THRESHOLD = 5   # citation 分数必须 >= 5，防止无引用的幻觉
+EVIDENCE_HARD_THRESHOLD = 10  # evidence 分数必须 >= 10，确保有证据支持
+SCORE_THRESHOLD = 70          # 总分阈值
 
 
 GRADER_PROMPT = """你是一个答案质量评估器。请评估以下答案是否完整回答了用户问题。
@@ -174,16 +176,31 @@ class AnswerGrader:
                 if "suggestion" not in result:
                     result["suggestion"] = ""
 
-                # 硬性门槛检查：depth < 10 直接不通过
+                # 硬性门槛检查
                 depth_score = result.get("scores", {}).get("depth", 0)
+                citation_score = result.get("scores", {}).get("citation", 0)
+                evidence_score = result.get("scores", {}).get("evidence", 0)
                 total_score = result.get("score", 0)
 
+                # 按优先级检查各门槛
                 if depth_score < DEPTH_HARD_THRESHOLD:
                     result["passed"] = False
                     result["fail_reason"] = f"depth={depth_score} < {DEPTH_HARD_THRESHOLD} (硬性门槛)"
                     if not result.get("suggestion"):
                         result["suggestion"] = "答案深度不足，请调用 search_memory 获取具体剧情内容"
                     logger.info(f"Hard threshold failed: depth={depth_score}")
+                elif citation_score < CITATION_HARD_THRESHOLD:
+                    result["passed"] = False
+                    result["fail_reason"] = f"citation={citation_score} < {CITATION_HARD_THRESHOLD} (硬性门槛)"
+                    if not result.get("suggestion"):
+                        result["suggestion"] = "答案缺乏来源引用，请在回答中明确引用 Chapter/Task ID"
+                    logger.info(f"Hard threshold failed: citation={citation_score}")
+                elif evidence_score < EVIDENCE_HARD_THRESHOLD:
+                    result["passed"] = False
+                    result["fail_reason"] = f"evidence={evidence_score} < {EVIDENCE_HARD_THRESHOLD} (硬性门槛)"
+                    if not result.get("suggestion"):
+                        result["suggestion"] = "答案证据支持不足，请确保回答基于工具返回的实际内容"
+                    logger.info(f"Hard threshold failed: evidence={evidence_score}")
                 elif total_score >= SCORE_THRESHOLD:
                     result["passed"] = True
                     result["fail_reason"] = None

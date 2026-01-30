@@ -32,11 +32,14 @@ class Settings(BaseSettings):
     RERANKER_TOP_K: int = 5
 
     # LLM settings (for Agent)
-    # 支持两种命名: LLM_MODEL 或 GEMINI_MODEL
+    # 支持两种命名方式: LLM_MODEL/GEMINI_MODEL, GOOGLE_API_KEY/GEMINI_API_KEY
     LLM_MODEL: Optional[str] = None
     GEMINI_MODEL: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
+
+    # Grader/Refiner 使用轻量模型 (速度优先)
+    GRADER_MODEL: Optional[str] = None
 
     # Chunking settings
     MAX_CHUNK_SIZE: int = 1500
@@ -69,6 +72,10 @@ class Settings(BaseSettings):
         # Resolve GOOGLE_API_KEY: prefer GOOGLE_API_KEY, fallback to GEMINI_API_KEY
         if not self.GOOGLE_API_KEY:
             self.GOOGLE_API_KEY = self.GEMINI_API_KEY
+
+        # Resolve GRADER_MODEL: default to gemini-2.5-flash for speed
+        if not self.GRADER_MODEL:
+            self.GRADER_MODEL = "gemini-2.5-flash"
 
         return self
 

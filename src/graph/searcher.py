@@ -4,8 +4,11 @@ Graph search interface for the graph_search tool.
 Provides query methods for retrieving entity relationships from Neo4j.
 """
 
+import logging
 from typing import List, Dict, Any, Optional
 from .connection import Neo4jConnection
+
+logger = logging.getLogger(__name__)
 
 
 class GraphSearcher:
@@ -136,12 +139,16 @@ class GraphSearcher:
         Returns:
             Dictionary with 'entities' list and metadata
         """
+        logger.info(f"[Neo4j] search: entity={entity}, relation={relation}, limit={limit}")
+
         if relation:
             # Search for specific relationship type
             results = self._search_specific_relation(entity, relation, limit)
         else:
             # Search for all relationships
             results = self._search_all_relations(entity, limit)
+
+        logger.debug(f"[Neo4j] search result: {len(results)} relations found")
 
         return {
             "entity": entity,
@@ -221,6 +228,8 @@ class GraphSearcher:
         Returns:
             List of relationship events sorted by time.
         """
+        logger.info(f"[Neo4j] search_history: entity={entity}, target={target}")
+
         canonical_source = self._resolve_canonical_name(entity)
         canonical_target = self._resolve_canonical_name(target) if target else None
 
@@ -245,7 +254,9 @@ class GraphSearcher:
         if canonical_target:
             params["target"] = canonical_target
 
-        return self.conn.execute(query, params)
+        results = self.conn.execute(query, params)
+        logger.debug(f"[Neo4j] search_history result: {len(results)} events found")
+        return results
 
     def get_organization_members(self, org_name: str) -> List[Dict[str, Any]]:
         """
@@ -286,11 +297,20 @@ class GraphSearcher:
         Returns:
             Path information or None if no path exists
         """
+        logger.info(f"[Neo4j] get_path_between: {entity1} -> {entity2}")
+
         canonical_1 = self._resolve_canonical_name(entity1)
         canonical_2 = self._resolve_canonical_name(entity2)
         query = self.QUERY_TEMPLATES["path_between"]
         results = self.conn.execute(query, {"entity1": canonical_1, "entity2": canonical_2})
-        return results[0] if results else None
+        result = results[0] if results else None
+
+        if result:
+            logger.debug(f"[Neo4j] path found: {result.get('path_nodes', [])}")
+        else:
+            logger.debug(f"[Neo4j] no path found between {entity1} and {entity2}")
+
+        return result
 
     def get_friends(self, char_name: str) -> List[Dict[str, Any]]:
         """
