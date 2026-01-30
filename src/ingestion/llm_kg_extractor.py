@@ -181,10 +181,11 @@ class LLMKnowledgeGraphExtractor:
             api_key: API key (defaults to GEMINI_API_KEY env var)
         """
         from llama_index.llms.openai_like import OpenAILike
+        from .entity_normalizer import EntityNormalizer
 
         self.model = model or os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
         api_base = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
-        
+
         # Try GEMINI_API_KEY first, then GOOGLE_API_KEY
         api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
@@ -199,6 +200,7 @@ class LLMKnowledgeGraphExtractor:
             context_window=32000,
         )
         self.structured_llm = self.llm.as_structured_llm(KnowledgeGraphOutput)
+        self.normalizer = EntityNormalizer()
 
     def _build_prompt(self, text: str) -> str:
         """Build the extraction prompt with the input text."""
@@ -216,7 +218,20 @@ class LLMKnowledgeGraphExtractor:
         """
         prompt = self._build_prompt(text)
         response = self.structured_llm.complete(prompt)
-        return response.raw
+        kg_output = response.raw
+
+        # Normalize Entities
+        for entity in kg_output.entities:
+            normalized_name = self.normalizer.normalize(entity.name, entity.entity_type)
+            if normalized_name != entity.name:
+                entity.name = normalized_name
+
+        # Normalize Relationships
+        for rel in kg_output.relationships:
+            rel.source = self.normalizer.normalize(rel.source)
+            rel.target = self.normalizer.normalize(rel.target)
+
+        return kg_output
 
     def extract_entities_only(self, text: str) -> List[ExtractedEntity]:
         """

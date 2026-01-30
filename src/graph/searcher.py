@@ -55,11 +55,12 @@ class GraphSearcher:
                 o.description as description,
                 r.role as role
         """,
-        # Get shortest path between two entities
+        # Get shortest path between two entities (Excluding generic Region nodes to avoid useless paths)
         "path_between": """
             MATCH path = shortestPath(
                 (a {name: $entity1})-[*..4]-(b {name: $entity2})
             )
+            WHERE none(n in nodes(path) WHERE n:Region OR n:Nation)
             RETURN
                 [n in nodes(path) | n.name] as path_nodes,
                 [r in relationships(path) | type(r)] as path_relations,
@@ -156,28 +157,29 @@ class GraphSearcher:
         """
         # Try fulltext search on Character index (ADR-006)
         query = """
-            CALL db.index.fulltext.queryNodes("entity_alias_index", $name) 
-            YIELD node, score 
-            RETURN node.name as name, node.aliases as aliases, score 
+            CALL db.index.fulltext.queryNodes("entity_alias_index", $name)
+            YIELD node, score
+            RETURN node.name as name, node.aliases as aliases, score
             LIMIT 5
         """
         try:
             results = self.conn.execute(query, {"name": entity_name})
-            
+
             # Strategy: Prefer nodes that have aliases (implies Seed/Main Character)
             # 1. Look for match with aliases
             for res in results:
                 if res.get("aliases") and len(res["aliases"]) > 0:
                      return res["name"]
-            
-            # 2. Fallback to top score
-            if results and results[0]["score"] > 0.0:
-                return results[0]["name"]
-                
+
+            # 2. Fallback to top score if score is high enough (e.g. > 0.8)
+            # For now we accept any match returned by Lucene as better than nothing
+            if results:
+                 return results[0]["name"]
+
         except Exception:
             # Index might not exist or other error, fallback
             pass
-            
+
         return entity_name
 
     def _search_all_relations(self, entity: str, limit: int) -> List[Dict[str, Any]]:
@@ -191,7 +193,7 @@ class GraphSearcher:
     ) -> List[Dict[str, Any]]:
         """Search for specific relationship type."""
         canonical_name = self._resolve_canonical_name(entity)
-        
+
         # Build query dynamically
         query = f"""
             MATCH (a {{name: $entity}})-[r:{relation}]-(b)
@@ -205,31 +207,31 @@ class GraphSearcher:
             LIMIT $limit
         """
         return self.conn.execute(query, {"entity": canonical_name, "limit": limit})
-        
+
     def search_history(
         self, entity: str, target: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Retrieve relationship history (temporal evolution) for an entity.
-        
+
         Args:
             entity: The main entity to track
             target: Optional target entity to filter history with
-            
+
         Returns:
             List of relationship events sorted by time.
         """
         canonical_source = self._resolve_canonical_name(entity)
         canonical_target = self._resolve_canonical_name(target) if target else None
-        
+
         filters = "WHERE a.name = $source"
         if canonical_target:
             filters += " AND b.name = $target"
-            
+
         query = f"""
             MATCH (a)-[r]->(b)
             {filters}
-            RETURN 
+            RETURN
                 a.name as source,
                 b.name as target,
                 type(r) as relation,
@@ -238,11 +240,11 @@ class GraphSearcher:
                 r.evidence as evidence
             ORDER BY r.chapter ASC, r.task_id ASC
         """
-        
+
         params = {"source": canonical_source}
         if canonical_target:
             params["target"] = canonical_target
-            
+
         return self.conn.execute(query, params)
 
     def get_organization_members(self, org_name: str) -> List[Dict[str, Any]]:
@@ -284,8 +286,10 @@ class GraphSearcher:
         Returns:
             Path information or None if no path exists
         """
+        canonical_1 = self._resolve_canonical_name(entity1)
+        canonical_2 = self._resolve_canonical_name(entity2)
         query = self.QUERY_TEMPLATES["path_between"]
-        results = self.conn.execute(query, {"entity1": entity1, "entity2": entity2})
+        results = self.conn.execute(query, {"entity1": canonical_1, "entity2": canonical_2})
         return results[0] if results else None
 
     def get_friends(self, char_name: str) -> List[Dict[str, Any]]:
@@ -298,8 +302,9 @@ class GraphSearcher:
         Returns:
             List of friend information
         """
+        canonical_name = self._resolve_canonical_name(char_name)
         query = self.QUERY_TEMPLATES["friends"]
-        return self.conn.execute(query, {"entity": char_name})
+        return self.conn.execute(query, {"entity": canonical_name})
 
     def get_partners(self, char_name: str) -> List[Dict[str, Any]]:
         """
@@ -311,8 +316,9 @@ class GraphSearcher:
         Returns:
             List of partner information
         """
+        canonical_name = self._resolve_canonical_name(char_name)
         query = self.QUERY_TEMPLATES["partners"]
-        return self.conn.execute(query, {"entity": char_name})
+        return self.conn.execute(query, {"entity": canonical_name})
 
     def get_character_chunks(
         self, char_name: str, limit: int = 50
@@ -327,8 +333,9 @@ class GraphSearcher:
         Returns:
             List of chunk information
         """
+        canonical_name = self._resolve_canonical_name(char_name)
         query = self.QUERY_TEMPLATES["character_chunks"]
-        return self.conn.execute(query, {"entity": char_name, "limit": limit})
+        return self.conn.execute(query, {"entity": canonical_name, "limit": limit})
 
     def get_chunk_characters(self, chunk_id: str) -> List[Dict[str, Any]]:
         """
@@ -345,71 +352,15 @@ class GraphSearcher:
 
     def natural_language_query(self, question: str) -> Dict[str, Any]:
         """
-        Process a natural language query about relationships.
+        DEPRECATED: Use specific tools (e.g., search(), get_friends()) coupled with
+        an LLM Agent instead of this rule-based router.
 
-        This is a simplified implementation that extracts entity names
-        and relationship keywords from the question.
-
-        Args:
-            question: Natural language question
-
-        Returns:
-            Query results
+        Original Purpose: Process a natural language query about relationships.
         """
-        # Simple keyword extraction (can be enhanced with NLP)
-        question_lower = question.lower()
-
-        # Check for relationship keywords
-        if "朋友" in question or "friend" in question_lower:
-            # Extract character name (simplified)
-            for char in self._get_all_character_names():
-                if char in question:
-                    return {
-                        "query_type": "friends",
-                        "entity": char,
-                        "results": self.get_friends(char),
-                    }
-
-        if "组织" in question or "部族" in question or "属于" in question:
-            for char in self._get_all_character_names():
-                if char in question:
-                    return {
-                        "query_type": "organization",
-                        "entity": char,
-                        "results": self.get_character_organization(char),
-                    }
-
-        if "成员" in question:
-            for org in self._get_all_organization_names():
-                if org in question:
-                    return {
-                        "query_type": "members",
-                        "entity": org,
-                        "results": self.get_organization_members(org),
-                    }
-
-        # Default: search for any mentioned entity
-        for char in self._get_all_character_names():
-            if char in question:
-                return {
-                    "query_type": "all_relations",
-                    "entity": char,
-                    "results": self.search(char)["entities"],
-                }
-
-        return {"query_type": "unknown", "results": []}
-
-    def _get_all_character_names(self) -> List[str]:
-        """Get all character names from the graph."""
-        query = "MATCH (c:Character) RETURN c.name as name"
-        results = self.conn.execute(query)
-        return [r["name"] for r in results]
-
-    def _get_all_organization_names(self) -> List[str]:
-        """Get all organization names from the graph."""
-        query = "MATCH (o:Organization) RETURN o.name as name"
-        results = self.conn.execute(query)
-        return [r["name"] for r in results]
+        raise NotImplementedError(
+            "natural_language_query is deprecated. Please use specific API methods "
+            "like search(), get_friends(), etc."
+        )
 
     def __enter__(self):
         """Context manager entry."""

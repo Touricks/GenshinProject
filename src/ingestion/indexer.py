@@ -191,6 +191,7 @@ class VectorIndexer:
         query_vector: List[float],
         limit: int = 5,
         filter_conditions: Optional[dict] = None,
+        sort_by: str = "relevance",
     ) -> List[dict]:
         """
         Search for similar vectors.
@@ -199,6 +200,7 @@ class VectorIndexer:
             query_vector: Query embedding vector
             limit: Number of results to return
             filter_conditions: Optional filter conditions
+            sort_by: Sort method ("relevance" or "time")
 
         Returns:
             List of search results with payload
@@ -215,14 +217,18 @@ class VectorIndexer:
                 )
             qdrant_filter = Filter(must=conditions)
 
+        # For time sorting, we might want to fetch more candidates to ensure
+        # we have a good timeline coverage, but for now we stick to limit.
+        search_limit = limit if sort_by == "relevance" else limit * 2
+
         response = self.client.query_points(
             collection_name=self.collection_name,
             query=query_vector,
-            limit=limit,
+            limit=search_limit,
             query_filter=qdrant_filter,
         )
 
-        return [
+        results = [
             {
                 "id": r.id,
                 "score": r.score,
@@ -230,3 +236,18 @@ class VectorIndexer:
             }
             for r in response.points
         ]
+
+        if sort_by == "time":
+            # Sort by chapter_number first, then event_order
+            # Default to 0 if missing
+            results.sort(
+                key=lambda x: (
+                    x["payload"].get("chapter_number", 0),
+                    x["payload"].get("event_order", 0),
+                )
+            )
+            # Trim strictly back to limit? Or keep the expanded context?
+            # Usually strict limit is expected by the caller.
+            results = results[:limit]
+
+        return results
