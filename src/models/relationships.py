@@ -24,6 +24,7 @@ class RelationType(str, Enum):
 
     # Event relationships
     PARTICIPATED_IN = "PARTICIPATED_IN"
+    EXPERIENCES = "EXPERIENCES"  # Character experiences a major Event
 
     # Location relationships
     OCCURRED_AT = "OCCURRED_AT"

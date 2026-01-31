@@ -116,7 +116,8 @@ class AgentTracer:
             return
 
         # Truncate long outputs for readability
-        output_truncated = output[:1000] + "..." if len(output) > 1000 else output
+        # 增加到 2000 字符以保留完整的 chunk 内容
+        output_truncated = output[:2000] + "..." if len(output) > 2000 else output
 
         tool_call = {
             "tool": tool,

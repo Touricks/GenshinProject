@@ -13,12 +13,11 @@ from typing import List, Optional, Literal, Set
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-# Load .env from src directory
-env_path = Path(__file__).resolve().parent.parent / ".env"
+# Load .env from project root (two levels up from this file)
+# This file is at: src/ingestion/llm_kg_extractor.py
+# Project root is at: ../../
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(env_path)
-print(f"DEBUG: Loading .env from {env_path}")
-print(f"DEBUG: GOOGLE_API_KEY present: {'GOOGLE_API_KEY' in os.environ}")
-print(f"DEBUG: GEMINI_API_KEY present: {'GEMINI_API_KEY' in os.environ}")
 
 
 # =============================================================================

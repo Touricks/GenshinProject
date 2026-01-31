@@ -370,6 +370,83 @@ class GraphSearcher:
         query = self.QUERY_TEMPLATES["chunk_characters"]
         return self.conn.execute(query, {"chunk_id": chunk_id})
 
+    def get_major_events(
+        self,
+        entity: str,
+        event_type: Optional[str] = None,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get major events experienced by a character.
+
+        This method queries MajorEvent nodes connected via EXPERIENCES edges.
+        It addresses the "abstract query vs concrete narrative" semantic gap:
+        - User asks: "How did the girl return to the world?"
+        - This returns: ["献出身体", "化作月光", ...] with summaries
+
+        Args:
+            entity: Character name (supports alias resolution)
+            event_type: Optional filter by event type
+                        (sacrifice/transformation/acquisition/loss/
+                         encounter/conflict/revelation/milestone)
+            limit: Maximum number of events to return
+
+        Returns:
+            List of event dicts sorted by chapter ASC, containing:
+            - event_name: Name of the event
+            - event_type: Type classification
+            - chapter: Chapter number
+            - summary: One-sentence summary
+            - evidence: Original text evidence
+            - role: Character's role (subject/object/witness)
+            - outcome: Effect of the event
+        """
+        logger.info(
+            f"[Neo4j] get_major_events: entity={entity}, event_type={event_type}"
+        )
+
+        canonical_name = self._resolve_canonical_name(entity)
+
+        if event_type:
+            query = """
+                MATCH (c:Character {name: $entity})-[r:EXPERIENCES]->(e:MajorEvent)
+                WHERE e.event_type = $event_type
+                RETURN e.name as event_name,
+                       e.event_type as event_type,
+                       e.chapter as chapter,
+                       e.task_id as task_id,
+                       e.summary as summary,
+                       e.evidence as evidence,
+                       r.role as role,
+                       r.outcome as outcome
+                ORDER BY e.chapter ASC
+                LIMIT $limit
+            """
+            results = self.conn.execute(
+                query,
+                {"entity": canonical_name, "event_type": event_type, "limit": limit},
+            )
+        else:
+            query = """
+                MATCH (c:Character {name: $entity})-[r:EXPERIENCES]->(e:MajorEvent)
+                RETURN e.name as event_name,
+                       e.event_type as event_type,
+                       e.chapter as chapter,
+                       e.task_id as task_id,
+                       e.summary as summary,
+                       e.evidence as evidence,
+                       r.role as role,
+                       r.outcome as outcome
+                ORDER BY e.chapter ASC
+                LIMIT $limit
+            """
+            results = self.conn.execute(
+                query, {"entity": canonical_name, "limit": limit}
+            )
+
+        logger.debug(f"[Neo4j] get_major_events result: {len(results)} events found")
+        return results
+
     def natural_language_query(self, question: str) -> Dict[str, Any]:
         """
         DEPRECATED: Use specific tools (e.g., search(), get_friends()) coupled with

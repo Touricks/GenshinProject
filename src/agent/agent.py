@@ -21,10 +21,11 @@ from .tracer import AgentTracer
 logger = logging.getLogger(__name__)
 
 # Progressive limit expansion for search_memory (3 rounds)
+# 广度优先策略：每次少量精确结果 + 多工具组合
 LIMIT_PROGRESSION = {
-    1: 5,   # 第1轮
-    2: 8,   # 第2轮
-    3: 12,  # 第3轮
+    1: 3,  # 第1轮 - 少量精确结果
+    2: 3,  # 第2轮 - 继续少量
+    3: 5,  # 第3轮 - 略微扩大
 }
 
 
@@ -114,6 +115,7 @@ class GenshinRetrievalAgent:
             lookup_knowledge,
             find_connection,
             track_journey,
+            get_character_events,
         )
         from ..retrieval.search_memory import search_memory as _search_memory
 
@@ -166,6 +168,7 @@ class GenshinRetrievalAgent:
                 find_connection,
                 track_journey,
                 search_memory_with_limit,
+                get_character_events,  # NEW: Major events for abstract queries
             ],
             llm=self._llm,
             system_prompt=SYSTEM_PROMPT,
@@ -309,7 +312,7 @@ class GenshinRetrievalAgent:
 
         for attempt in range(1, max_retries + 1):
             # Set progressive limit
-            current_limit = LIMIT_PROGRESSION.get(attempt, 20)
+            current_limit = LIMIT_PROGRESSION.get(attempt, 5)
             self._set_search_limit(current_limit)
 
             logger.info(f"Attempt {attempt}/{max_retries} with limit={current_limit}")
@@ -325,10 +328,12 @@ class GenshinRetrievalAgent:
             async for event in handler.stream_events():
                 if isinstance(event, ToolCallResult):
                     tool_output = str(event.tool_output)
+                    # 增加截断长度到 2000 字符，确保完整的 chunk 内容不被截断
+                    # 之前 500 字符导致关键证据（如角色死亡对话）被截断
                     attempt_tool_calls.append({
                         "tool": event.tool_name,
                         "kwargs": event.tool_kwargs,
-                        "output": tool_output[:500],
+                        "output": tool_output[:2000],
                     })
                     # Log tool call to tracer
                     self._tracer.log_tool_call(

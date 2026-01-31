@@ -5,8 +5,8 @@
 ## 1. Environment
 
 ```bash
-# Install dependencies
-pip install -r src/requirements.txt
+# Enter virtual environment
+source .venv/bin/activate
 
 # Run Neo4j
 docker-compose up -d neo4j (Port: 7687)

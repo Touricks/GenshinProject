@@ -56,6 +56,23 @@ from .character_validator import (
     filter_character_names,
 )
 
+# LLM-based Event extraction
+from .event_extractor import (
+    LLMEventExtractor,
+    EventExtractionOutput,
+    ExtractedEvent,
+    CharacterRole,
+    EventType,
+    extract_events_from_text,
+    extract_events_from_file,
+)
+from .incremental_event_extractor import (
+    IncrementalEventExtractor,
+    EventCache,
+    EventFileTrackingInfo,
+    write_events_to_graph,
+)
+
 __all__ = [
     # Vector DB pipeline
     "DocumentLoader",
@@ -90,4 +107,17 @@ __all__ = [
     "ValidationResult",
     "validate_character_name",
     "filter_character_names",
+    # LLM-based Event extraction
+    "LLMEventExtractor",
+    "EventExtractionOutput",
+    "ExtractedEvent",
+    "CharacterRole",
+    "EventType",
+    "extract_events_from_text",
+    "extract_events_from_file",
+    # Incremental Event extraction
+    "IncrementalEventExtractor",
+    "EventCache",
+    "EventFileTrackingInfo",
+    "write_events_to_graph",
 ]

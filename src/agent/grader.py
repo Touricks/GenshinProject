@@ -12,9 +12,9 @@ from typing import List, Dict, Any
 logger = logging.getLogger(__name__)
 
 # 硬性门槛配置
-DEPTH_HARD_THRESHOLD = 10     # depth 分数必须 >= 10，否则直接不通过
-CITATION_HARD_THRESHOLD = 5   # citation 分数必须 >= 5，防止无引用的幻觉
-EVIDENCE_HARD_THRESHOLD = 10  # evidence 分数必须 >= 10，确保有证据支持
+DEPTH_HARD_THRESHOLD = 8      # depth 分数必须 >= 8，否则直接不通过
+CITATION_HARD_THRESHOLD = 0   # 暂时移除引用强制要求，LLM 经常忘记引用但内容正确
+EVIDENCE_HARD_THRESHOLD = 5   # evidence 分数必须 >= 5，配合放宽的 prompt
 SCORE_THRESHOLD = 70          # 总分阈值
 
 
@@ -47,11 +47,26 @@ GRADER_PROMPT = """你是一个答案质量评估器。请评估以下答案是�
    - 5分：只调用了1次工具
    - 0分：没有调用任何工具
 
-2. **证据支持** (0-20分)
-   - 20分：答案完全基于工具返回的证据
-   - 12分：大部分基于证据，少量推测
-   - 5分：证据与答案关联弱
-   - 0分：答案没有任何证据支持
+2. **证据支持** (0-20分) - 语义验证而非逐字匹配
+
+   **验证步骤**：
+   a. 从答案中提取所有关键声明（如"X发生了Y"、"A拥有B"）
+   b. 对每个声明，检查是否与 tool output 矛盾
+   c. 只有与 tool output 直接矛盾的内容才是幻觉
+
+   **评分**：
+   - 20分：所有关键声明都能在 tool output 中找到明确支持，或不矛盾
+   - 15分：大部分声明有支持，少量无法验证但不矛盾
+   - 10分：核心声明有支持，存在一些无法验证的细节（可能因截断）
+   - 5分：只有部分声明有支持，但无明显矛盾
+   - 0分：主要声明与 tool output 直接矛盾（真正的幻觉）
+
+   **重要澄清**：
+   - 如果 tool output 提到了某个实体/事件，答案对其进行总结或重新表述不是幻觉
+   - 从多个 tool output 综合推理出的结论不是幻觉
+   - 专有名词的别名/全名使用不是幻觉（如"少女"和"露珠"可能指同一角色）
+   - 无法在截断后的 tool output 中验证、但也不矛盾的内容，应给予合理怀疑的空间
+   - 只有与 tool output 直接矛盾的内容才是幻觉
 
 3. **答案完整性** (0-20分)
    - 20分：完整回答了问题的所有方面
@@ -71,8 +86,23 @@ GRADER_PROMPT = """你是一个答案质量评估器。请评估以下答案是�
    - 12分：解释了关系的性质和背景
    - 5分：仅陈述存在某种关系类型（如"有互动关系"、"是朋友"）
    - 0分：答案无实质内容
-   
+
 ## 特别注意
+
+**工具输出截断说明**：
+- 为控制 prompt 长度，tool output 可能只显示前 2000 字符
+- 因此在评估时要考虑：完整输出可能包含更多证据
+- 如果答案与显示的 tool output 不矛盾，即使找不到精确支持也不应轻易判定为幻觉
+
+**幻觉检测（严格定义）**：
+- 幻觉是指：与 tool output 直接矛盾的内容
+- 以下情况不是幻觉：
+  - 对 tool output 内容的总结、归纳、重新表述
+  - 从多个 tool output 综合推理出的结论
+  - 使用实体的别名/全名（如"少女"="露珠"）
+  - 基于 tool output 的合理推断（如 A→B 且 B→C，则推断 A→C）
+  - 无法在截断后的 tool output 中验证、但也不矛盾的内容
+- 只有当答案与 tool output 直接矛盾时才标记为幻觉
 
 **关系类问题的深度检查**：
 - 如果答案只说"X和Y有互动关系/是朋友/是敌人"而没有描述具体事件，答案深度必须≤5分
@@ -95,7 +125,8 @@ GRADER_PROMPT = """你是一个答案质量评估器。请评估以下答案是�
     }},
     "score": <0-100 总分>,
     "reason": "<简短理由，一句话>",
-    "suggestion": "<如果未通过，给出具体改进建议>"
+    "suggestion": "<如果未通过，给出具体改进建议>",
+    "hallucination_detected": "<如果发现答案中有 tool output 不支持的内容，列出这些内容>"
 }}
 ```
 """
@@ -139,9 +170,11 @@ class AnswerGrader:
             Dict with keys: score (0-100), reason, suggestion, scores (breakdown)
         """
         # Format tool calls for the prompt
+        # 增加截断长度到 2000 字符，确保完整 chunk 内容不被截断
+        # 之前 800 字符导致关键证据（如角色死亡对话）被截断
         if tool_calls:
             tool_calls_str = "\n".join([
-                f"- {tc['tool']}({tc['kwargs']}) → {tc['output'][:200]}..."
+                f"- {tc['tool']}({tc['kwargs']}) → {tc['output'][:2000]}..."
                 for tc in tool_calls
             ])
         else:

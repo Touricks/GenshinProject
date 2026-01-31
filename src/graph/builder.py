@@ -47,6 +47,9 @@ class GraphBuilder:
             "CREATE CONSTRAINT location_name IF NOT EXISTS FOR (l:Location) REQUIRE l.name IS UNIQUE",
             "CREATE CONSTRAINT event_name IF NOT EXISTS FOR (e:Event) REQUIRE e.name IS UNIQUE",
             "CREATE CONSTRAINT chunk_id IF NOT EXISTS FOR (ch:Chunk) REQUIRE ch.chunk_id IS UNIQUE",
+            # MajorEvent: composite unique key for deduplication
+            # (chapter, type, primary_character) ensures no duplicate events
+            "CREATE CONSTRAINT major_event_unique IF NOT EXISTS FOR (e:MajorEvent) REQUIRE (e.chapter, e.event_type, e.primary_character) IS UNIQUE",
         ]
 
         for constraint in constraints:
@@ -65,6 +68,9 @@ class GraphBuilder:
             "CREATE INDEX chunk_task IF NOT EXISTS FOR (ch:Chunk) ON (ch.task_id)",
             # Fulltext index for alias resolution (ADR-006)
             "CREATE FULLTEXT INDEX entity_alias_index IF NOT EXISTS FOR (c:Character) ON EACH [c.name, c.aliases]",
+            # MajorEvent indexes for efficient querying
+            "CREATE INDEX major_event_type IF NOT EXISTS FOR (e:MajorEvent) ON (e.event_type)",
+            "CREATE INDEX major_event_chapter IF NOT EXISTS FOR (e:MajorEvent) ON (e.chapter)",
         ]
 
         for index in indexes:
@@ -151,6 +157,211 @@ class GraphBuilder:
         RETURN e.name as name
         """
         self.conn.execute_write(query, event.to_dict())
+
+    def create_major_event(
+        self,
+        name: str,
+        event_type: str,
+        chapter: int,
+        task_id: str,
+        primary_character: str,
+        summary: str,
+        evidence: Optional[str] = None,
+        outcome: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Create a MajorEvent node with deduplication.
+
+        Uses MERGE on (chapter, event_type, primary_character) to prevent duplicates.
+        This allows idempotent re-extraction of the same dialogue.
+
+        Args:
+            name: Event name/title (e.g., "少女献出身体")
+            event_type: Event type (sacrifice/transformation/acquisition/...)
+            chapter: Chapter number where event occurs
+            task_id: Task ID for the event
+            primary_character: Main character involved (for dedup key)
+            summary: One-sentence summary of the event
+            evidence: Original text evidence supporting the event
+            outcome: Outcome/effect of the event
+
+        Returns:
+            The event name if created/updated, None on failure
+        """
+        query = """
+        MERGE (e:MajorEvent {
+            chapter: $chapter,
+            event_type: $event_type,
+            primary_character: $primary_character
+        })
+        ON CREATE SET
+            e.name = $name,
+            e.task_id = $task_id,
+            e.summary = $summary,
+            e.evidence = $evidence,
+            e.outcome = $outcome
+        ON MATCH SET
+            e.name = $name,
+            e.summary = $summary,
+            e.evidence = $evidence,
+            e.outcome = $outcome
+        RETURN e.name as name
+        """
+        try:
+            result = self.conn.execute_write(
+                query,
+                {
+                    "name": name,
+                    "event_type": event_type,
+                    "chapter": chapter,
+                    "task_id": task_id,
+                    "primary_character": primary_character,
+                    "summary": summary,
+                    "evidence": evidence,
+                    "outcome": outcome,
+                },
+            )
+            return result[0]["name"] if result else None
+        except Exception as e:
+            print(f"Error creating MajorEvent: {e}")
+            return None
+
+    def create_experiences_edge(
+        self,
+        character_name: str,
+        event_chapter: int,
+        event_type: str,
+        event_primary_character: str,
+        role: str = "subject",
+        outcome: Optional[str] = None,
+    ) -> bool:
+        """
+        Create an EXPERIENCES edge from a Character to a MajorEvent.
+
+        Args:
+            character_name: Name of the character
+            event_chapter: Chapter of the event (part of event's composite key)
+            event_type: Type of the event (part of event's composite key)
+            event_primary_character: Primary character of event (part of event's composite key)
+            role: Character's role in event (subject/object/witness)
+            outcome: Character-specific outcome from the event
+
+        Returns:
+            True if edge created successfully, False otherwise
+        """
+        query = """
+        MATCH (c:Character {name: $character_name})
+        MATCH (e:MajorEvent {
+            chapter: $event_chapter,
+            event_type: $event_type,
+            primary_character: $event_primary_character
+        })
+        MERGE (c)-[r:EXPERIENCES]->(e)
+        SET r.role = $role,
+            r.outcome = $outcome
+        RETURN type(r) as rel_type
+        """
+        try:
+            result = self.conn.execute_write(
+                query,
+                {
+                    "character_name": character_name,
+                    "event_chapter": event_chapter,
+                    "event_type": event_type,
+                    "event_primary_character": event_primary_character,
+                    "role": role,
+                    "outcome": outcome,
+                },
+            )
+            return len(result) > 0
+        except Exception as e:
+            print(f"Error creating EXPERIENCES edge: {e}")
+            return False
+
+    def ingest_extracted_events(
+        self,
+        events: List[Dict],
+        chapter: int,
+        task_id: str,
+    ) -> int:
+        """
+        Ingest a batch of extracted events from LLMEventExtractor.
+
+        This method:
+        1. Ensures all involved characters exist (creates if missing)
+        2. Creates MajorEvent nodes
+        3. Creates EXPERIENCES edges linking characters to events
+
+        Args:
+            events: List of event dicts from EventExtractionOutput.events
+            chapter: Chapter number
+            task_id: Task ID
+
+        Returns:
+            Number of events successfully ingested
+        """
+        count = 0
+        edge_failures = []
+
+        for event in events:
+            # Determine primary character (first subject)
+            primary_char = None
+            for char in event.get("characters", []):
+                if char.get("role") == "subject":
+                    primary_char = char.get("name")
+                    break
+            if not primary_char and event.get("characters"):
+                primary_char = event["characters"][0].get("name", "unknown")
+
+            if not primary_char:
+                continue
+
+            # Ensure all involved characters exist before creating edges
+            for char in event.get("characters", []):
+                char_name = char.get("name")
+                if char_name:
+                    self.create_character_simple(char_name, task_id, chapter)
+
+            # Create the MajorEvent node
+            event_name = self.create_major_event(
+                name=event.get("name", ""),
+                event_type=event.get("event_type", "milestone"),
+                chapter=chapter,
+                task_id=task_id,
+                primary_character=primary_char,
+                summary=event.get("summary", ""),
+                evidence=event.get("evidence"),
+                outcome=event.get("outcome"),
+            )
+
+            if not event_name:
+                continue
+
+            # Create EXPERIENCES edges for all involved characters
+            for char in event.get("characters", []):
+                char_name = char.get("name")
+                if char_name:
+                    success = self.create_experiences_edge(
+                        character_name=char_name,
+                        event_chapter=chapter,
+                        event_type=event.get("event_type", "milestone"),
+                        event_primary_character=primary_char,
+                        role=char.get("role", "witness"),
+                        outcome=event.get("outcome"),
+                    )
+                    if not success:
+                        edge_failures.append((char_name, event.get("name")))
+
+            count += 1
+
+        # Log edge failures if any
+        if edge_failures:
+            print(
+                f"Warning: Failed to create {len(edge_failures)} EXPERIENCES edges. "
+                f"First 5: {edge_failures[:5]}"
+            )
+
+        return count
 
     def create_character_simple(
         self,
@@ -396,8 +607,10 @@ class GraphBuilder:
             "organizations": "MATCH (o:Organization) RETURN count(o) as count",
             "locations": "MATCH (l:Location) RETURN count(l) as count",
             "events": "MATCH (e:Event) RETURN count(e) as count",
+            "major_events": "MATCH (e:MajorEvent) RETURN count(e) as count",
             "chunks": "MATCH (ch:Chunk) RETURN count(ch) as count",
             "relationships": "MATCH ()-[r]->() RETURN count(r) as count",
+            "experiences_edges": "MATCH ()-[r:EXPERIENCES]->() RETURN count(r) as count",
         }
 
         stats = {}
