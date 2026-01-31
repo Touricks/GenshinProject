@@ -157,26 +157,7 @@ EVENT_EXTRACTION_PROMPT = """你是一个原神（Genshin Impact）剧情分析�
 - **witness**: 事件的见证者
 
 ## 输出格式
-输出严格的JSON格式，只输出JSON，不要有其他内容：
-
-```json
-{
-  "events": [
-    {
-      "name": "事件名称",
-      "event_type": "sacrifice|transformation|acquisition|loss|encounter|conflict|revelation|milestone",
-      "characters": [
-        {"name": "角色名", "role": "subject|object|witness"}
-      ],
-      "summary": "事件摘要（一句话）",
-      "outcome": "事件结果（可选）",
-      "evidence": "原文引用"
-    }
-  ]
-}
-```
-
-如果没有重大事件，返回：{"events": []}
+请直接输出包含events数组的JSON对象。如果没有重大事件，返回空events数组。
 """
 
 
@@ -197,28 +178,23 @@ class LLMEventExtractor:
         Initialize the LLM event extractor.
 
         Args:
-            model: Model name (defaults to gemini-2.5-pro)
+            model: Model name (defaults to DATA_MODEL from settings)
             api_key: API key (defaults to GEMINI_API_KEY env var)
         """
-        from llama_index.llms.openai_like import OpenAILike
+        from llama_index.llms.google_genai import GoogleGenAI
         from .entity_normalizer import EntityNormalizer
+        from ..config import settings
 
-        self.model = model or os.getenv("EVENT_EXTRACTOR_MODEL", "gemini-2.5-flash")
-        api_base = os.getenv(
-            "GEMINI_BASE_URL",
-            "https://generativelanguage.googleapis.com/v1beta/openai/",
-        )
+        self.model = model or settings.DATA_MODEL
         api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
         if not api_key:
             raise ValueError("GEMINI_API_KEY or GOOGLE_API_KEY environment variable is required")
 
-        self.llm = OpenAILike(
+        # Use native Google GenAI LLM for schema-enforced structured output
+        self.llm = GoogleGenAI(
             model=self.model,
-            api_base=api_base,
             api_key=api_key,
-            is_chat_model=True,
-            context_window=32000,
         )
         self.structured_llm = self.llm.as_structured_llm(EventExtractionOutput)
         self.normalizer = EntityNormalizer()

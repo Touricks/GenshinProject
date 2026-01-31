@@ -2,34 +2,45 @@
 Build the Neo4j knowledge graph from dialogue data.
 
 Usage:
-    python -m scripts.build_graph [DATA_DIR]
-    python -m scripts.build_graph --clear  # Clear and rebuild
-    python -m scripts.build_graph --stats  # Show graph statistics
+    python -m src.scripts.cli_graph [DATA_DIR]
+    python -m src.scripts.cli_graph --clear  # Clear and rebuild
+    python -m src.scripts.cli_graph --stats  # Show graph statistics
 
 Examples:
-    # Build graph from default Data/ directory
-    python -m scripts.build_graph
-
-    # Build from custom directory
-    python -m scripts.build_graph /path/to/data
-
-    # Clear existing graph and rebuild
-    python -m scripts.build_graph --clear
-
-    # Show current graph statistics
-    python -m scripts.build_graph --stats
+    python -m src.scripts.cli_graph
+    python -m src.scripts.cli_graph --clear
+    python -m src.scripts.cli_graph --stats
 """
 
 import argparse
+import re
 from pathlib import Path
 from tqdm import tqdm
 
 from ..graph.connection import Neo4jConnection
 from ..graph.builder import GraphBuilder
-from ..ingestion.entity_extractor import EntityExtractor
 from ..ingestion.llm_kg_extractor import extract_kg_from_file
 from ..models.entities import MAIN_CHARACTERS
 from ..models.relationships import Relationship, RelationType
+
+
+def parse_file_metadata(file_path: Path) -> dict:
+    """
+    Parse task_id and chapter from file path.
+
+    Expected: Data/Archon/{task_id}/chapter{N}_dialogue.txt
+    Returns: {"task_id": "1608", "chapter": 160800}
+    """
+    task_id = file_path.parent.name
+    match = re.search(r"chapter(\d+)", file_path.stem)
+    chapter_num = int(match.group(1)) if match else 0
+
+    try:
+        global_chapter = int(task_id) * 100 + chapter_num
+    except ValueError:
+        global_chapter = chapter_num
+
+    return {"task_id": task_id, "chapter": global_chapter}
 
 
 def build_graph(
@@ -76,45 +87,23 @@ def build_graph(
         print(f"\n--- Phase 2: Processing Dialogue Files ---")
         print(f"Data directory: {data_dir}")
 
-        # Use EntityExtractor for metadata parsing only
-        metadata_extractor = EntityExtractor()
         data_path = Path(data_dir)
-
         if not data_path.exists():
             print(f"ERROR: Data directory not found: {data_dir}")
             return
 
-        # Get all dialogue files
         dialogue_files = sorted(data_path.rglob("chapter*_dialogue.txt"))
-
         print(f"Found {len(dialogue_files)} dialogue files")
 
-        # Track all discovered characters and relationships
         all_characters = set()
         all_relationships = []
 
-        # Process each file
         for file_path in tqdm(dialogue_files, desc="Processing files"):
             try:
-                # 1. Parse Metadata using EntityExtractor (regex fast path)
-                # We extract using extract_from_file but primarily use the metadata
-                regex_result = metadata_extractor.extract_from_file(file_path)
-                
-                # Global Timeline Logic (ADR-007 + Folder Strategy)
-                # Calculate global chapter from Folder ID and Chapter Number
-                try:
-                    folder_id = int(file_path.parent.name)
-                    local_chapter = regex_result.metadata.chapter_number or 0
-                    global_chapter = folder_id * 100 + local_chapter
-                    
-                    # Override metadata with global sequence
-                    regex_result.metadata.chapter_number = global_chapter
-                    regex_result.metadata.task_id = str(folder_id) # Ensure task context is folder ID
-                except ValueError:
-                     # Fallback for non-numeric folders (e.g. "Lore", "Backup")
-                    pass
-                
-                # 2. Extract Knowledge Graph using LLM (smart slow path)
+                # 1. Parse metadata from file path
+                metadata = parse_file_metadata(file_path)
+
+                # 2. Extract Knowledge Graph using LLM
                 try:
                     kg_output = extract_kg_from_file(file_path)
                 except Exception as e:
@@ -123,28 +112,20 @@ def build_graph(
 
                 # Collect characters from LLM output
                 for entity in kg_output.get_characters():
-                    # Normalize name (reuse extractor logic or simple strip)
                     char_name = entity.name.strip()
                     all_characters.add(char_name)
 
-                    # Create character node if not in seed data
                     if char_name not in MAIN_CHARACTERS:
                         builder.create_character_simple(
                             char_name,
-                            regex_result.metadata.task_id,
-                            regex_result.metadata.chapter_number,
+                            metadata["task_id"],
+                            metadata["chapter"],
                         )
-                        # TODO: We could use entity.role to update the character description/title immediately
-                        # but create_character_simple doesn't support it yet.
 
                 # Collect relationships from LLM output
                 for rel in kg_output.relationships:
-                    # Convert Pydantic ExtractedRelationship to Model Relationship
                     try:
-                        # Map string to Enum
                         rel_type_enum = RelationType(rel.relation_type)
-                        
-                        # Create proper Relationship object
                         new_rel = Relationship(
                             source=rel.source,
                             target=rel.target,
@@ -153,8 +134,8 @@ def build_graph(
                                 "description": rel.description,
                                 "evidence": rel.evidence
                             },
-                            chapter=regex_result.metadata.chapter_number,
-                            task_id=regex_result.metadata.task_id
+                            chapter=metadata["chapter"],
+                            task_id=metadata["task_id"]
                         )
                         all_relationships.append(new_rel)
                     except ValueError:

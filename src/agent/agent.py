@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 # 广度优先策略：每次少量精确结果 + 多工具组合
 LIMIT_PROGRESSION = {
     1: 3,  # 第1轮 - 少量精确结果
-    2: 3,  # 第2轮 - 继续少量
-    3: 5,  # 第3轮 - 略微扩大
+    2: 5,  # 第2轮 - 继续少量
+    3: 8,  # 第3轮 - 略微扩大
 }
 
 
@@ -74,7 +74,7 @@ class GenshinRetrievalAgent:
         self.verbose = verbose
         self.enable_grader = enable_grader
         self.settings = Settings()
-        self.model = model or self.settings.LLM_MODEL
+        self.model = model or self.settings.REASONING_MODEL
 
         # Lazy initialization
         self._agent = None
@@ -128,6 +128,16 @@ class GenshinRetrievalAgent:
             """
             Search the story text for specific plot details, dialogues, or events.
             This is the ONLY tool that returns actual story content (text chunks).
+
+            Args:
+                query: Search keywords (supports Chinese). Use specific terms for better results.
+                characters: Optional character name to filter results (e.g., "少女", "旅行者").
+                sort_by: Sort order - "relevance" (default, best matches first) or "time" (chronological).
+
+            Returns:
+                Formatted string with matching story chunks including chapter, task ID, and dialogue content.
+
+            Note: Result count is controlled by the system based on retry attempts.
             """
             return _search_memory(
                 query=query,
@@ -135,9 +145,6 @@ class GenshinRetrievalAgent:
                 sort_by=sort_by,
                 limit=self._current_limit,
             )
-
-        # Copy docstring for LLM to understand the tool
-        search_memory_with_limit.__doc__ = _search_memory.__doc__
 
         # Initialize LLM
         # Disable AFC (Automated Function Calling) to let ReActAgent
@@ -190,8 +197,8 @@ class GenshinRetrievalAgent:
             logger.info(f"Grader/Refiner using fast model: {self.settings.GRADER_MODEL}")
 
             self._grader = AnswerGrader(self._grader_llm)
-            # Refiner 使用主模型（需要强推理能力）
-            self._refiner = QueryRefiner(self._llm)
+            # Refiner 也使用快速模型（查询分解不需要强推理）
+            self._refiner = QueryRefiner(self._grader_llm)
 
         logger.info("GenshinRetrievalAgent initialized successfully (ReActAgent mode)")
 

@@ -1,7 +1,7 @@
 """
-Incremental Event Extractor.
+Incremental Knowledge Graph Extractor.
 
-Tracks file changes and extracts major events from dialogue files.
+Tracks file changes and extracts entities/relationships from dialogue files.
 Provides incremental processing with file change tracking and caching.
 """
 
@@ -13,29 +13,31 @@ from typing import Dict, List, Optional, Any, Set
 from datetime import datetime
 from dataclasses import dataclass, asdict
 
-from .event_extractor import (
-    LLMEventExtractor,
-    EventExtractionOutput,
-    ExtractedEvent,
+from .llm_kg_extractor import (
+    LLMKnowledgeGraphExtractor,
+    KnowledgeGraphOutput,
+    ExtractedEntity,
+    ExtractedRelationship,
 )
 
 
 @dataclass
-class EventFileTrackingInfo:
+class KGFileTrackingInfo:
     """Tracking information for a processed file."""
 
     file_path: str
     content_hash: str
     last_processed: str
-    event_count: int
+    entity_count: int
+    relationship_count: int
     task_id: str
     chapter: int
 
 
-class EventCache:
-    """Simple content-addressed cache for event extraction results."""
+class KGCache:
+    """Simple content-addressed cache for KG extraction results."""
 
-    def __init__(self, cache_dir: str = ".cache/events"):
+    def __init__(self, cache_dir: str = ".cache/kg"):
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -43,19 +45,22 @@ class EventCache:
         """Generate cache key from content hash."""
         return hashlib.md5(content.encode("utf-8")).hexdigest()
 
-    def get(self, content: str) -> Optional[EventExtractionOutput]:
+    def get(self, content: str) -> Optional[KnowledgeGraphOutput]:
         """Get cached result for content."""
         key = self._hash_key(content)
         cache_file = self.cache_dir / f"{key}.json"
         if cache_file.exists():
             try:
                 data = json.loads(cache_file.read_text(encoding="utf-8"))
-                return EventExtractionOutput(**data)
+                # Handle legacy cache format with "result" wrapper
+                if "result" in data:
+                    data = data["result"]
+                return KnowledgeGraphOutput(**data)
             except (json.JSONDecodeError, KeyError, TypeError):
                 return None
         return None
 
-    def set(self, content: str, result: EventExtractionOutput):
+    def set(self, content: str, result: KnowledgeGraphOutput):
         """Cache extraction result."""
         key = self._hash_key(content)
         cache_file = self.cache_dir / f"{key}.json"
@@ -73,66 +78,66 @@ class EventCache:
         }
 
 
-class IncrementalEventExtractor:
+class IncrementalKGExtractor:
     """
-    Incremental Event Extractor.
+    Incremental Knowledge Graph Extractor.
 
     Tracks file changes and only processes modified files.
-    Extracts major story events (sacrifices, transformations, etc.)
-    for building Event nodes in the knowledge graph.
+    Extracts entities and relationships for building the knowledge graph.
 
     Usage:
-        extractor = IncrementalEventExtractor()
+        extractor = IncrementalKGExtractor()
 
-        # Extract events from a single folder
-        events = extractor.extract_folder(Path("Data/Archon/1608"))
+        # Extract KG from a single folder
+        results = extractor.extract_folder(Path("Data/Archon/1608"))
 
         # Extract from all data
-        all_events = extractor.extract_all(Path("Data/"))
+        all_results = extractor.extract_all(Path("Data/"))
 
         # Write to graph
         from src.graph.builder import GraphBuilder
         with GraphBuilder() as builder:
-            for event_data in all_events:
-                builder.ingest_extracted_events(
-                    events=[e.model_dump() for e in event_data["events"]],
-                    chapter=event_data["chapter"],
-                    task_id=event_data["task_id"],
+            for result in all_results:
+                builder.ingest_kg_extraction(
+                    entities=result["entities"],
+                    relationships=result["relationships"],
+                    chapter=result["chapter"],
+                    task_id=result["task_id"],
                 )
     """
 
     def __init__(
         self,
-        cache_dir: str = ".cache/events",
+        cache_dir: str = ".cache/kg",
         tracking_file: Optional[str] = None,
     ):
         """
-        Initialize the incremental event extractor.
+        Initialize the incremental KG extractor.
 
         Args:
             cache_dir: Directory for cache storage
             tracking_file: Path to tracking JSON file
         """
-        self.cache = EventCache(cache_dir)
-        self.tracking_file = Path(tracking_file or f"{cache_dir}/event_tracking.json")
+        self.cache = KGCache(cache_dir)
+        self.tracking_file = Path(tracking_file or f"{cache_dir}/kg_tracking.json")
         self.tracking_file.parent.mkdir(parents=True, exist_ok=True)
         self._extractor = None
         self.tracking = self._load_tracking()
 
     @property
-    def extractor(self) -> LLMEventExtractor:
+    def extractor(self) -> LLMKnowledgeGraphExtractor:
         """Lazy load the LLM extractor."""
         if self._extractor is None:
-            self._extractor = LLMEventExtractor()
+            self._extractor = LLMKnowledgeGraphExtractor()
         return self._extractor
 
-    def _load_tracking(self) -> Dict[str, EventFileTrackingInfo]:
+    def _load_tracking(self) -> Dict[str, KGFileTrackingInfo]:
         """Load file tracking information from disk."""
         if self.tracking_file.exists():
             try:
                 data = json.loads(self.tracking_file.read_text(encoding="utf-8"))
                 return {
-                    k: EventFileTrackingInfo(**v)
+                    k: KGFileTrackingInfo(**v)
                     for k, v in data.get("files", {}).items()
                 }
             except (json.JSONDecodeError, KeyError, TypeError):
@@ -186,22 +191,6 @@ class IncrementalEventExtractor:
             "chapter_num": chapter_num,
         }
 
-    def _extract_characters_from_dialogue(self, text: str) -> List[str]:
-        """Extract character names from dialogue text (simple heuristic)."""
-        characters: Set[str] = set()
-        for line in text.split("\n"):
-            if "：" in line and not line.startswith("#"):
-                char_name = line.split("：")[0].strip()
-                # Filter out non-character lines
-                if (
-                    char_name
-                    and len(char_name) < 20
-                    and not char_name.startswith("（")
-                    and char_name not in {"选项", "---", "？？？"}
-                ):
-                    characters.add(char_name)
-        return list(characters)
-
     def get_changed_files(
         self,
         data_dir: Path,
@@ -235,7 +224,7 @@ class IncrementalEventExtractor:
         force: bool = False,
     ) -> Dict[str, Any]:
         """
-        Extract events from a single file with caching.
+        Extract KG from a single file with caching.
 
         Tracking is updated immediately after processing each file to prevent
         data loss if extraction is interrupted.
@@ -245,7 +234,7 @@ class IncrementalEventExtractor:
             force: If True, bypass cache and re-extract
 
         Returns:
-            Dict with keys: events, task_id, chapter, file_path
+            Dict with keys: entities, relationships, task_id, chapter, file_path
         """
         content = file_path.read_text(encoding="utf-8")
         content_hash = self._hash_content(content)
@@ -261,7 +250,8 @@ class IncrementalEventExtractor:
         if not force and file_key in self.tracking:
             if self.tracking[file_key].content_hash == content_hash and cached is not None:
                 return {
-                    "events": cached.events,
+                    "entities": cached.entities,
+                    "relationships": cached.relationships,
                     "task_id": metadata["task_id"],
                     "chapter": metadata["chapter"],
                     "file_path": file_key,
@@ -269,39 +259,32 @@ class IncrementalEventExtractor:
 
         if cached is not None:
             # Use cached result
-            events = cached.events
-            event_count = len(events)
+            entities = cached.entities
+            relationships = cached.relationships
         else:
-            # Extract characters for context
-            characters = self._extract_characters_from_dialogue(content)
-
             # Extract using LLM
-            result = self.extractor.extract(
-                dialogue=content,
-                characters=characters,
-                chapter=metadata["chapter"],
-                task_id=metadata["task_id"],
-            )
+            result = self.extractor.extract(content)
 
             # Cache result immediately
             self.cache.set(content, result)
-            events = result.events
-            event_count = len(events)
+            entities = result.entities
+            relationships = result.relationships
 
         # Update tracking immediately after extraction/cache hit
-        # This ensures progress is saved even if later files fail
-        self.tracking[file_key] = EventFileTrackingInfo(
+        self.tracking[file_key] = KGFileTrackingInfo(
             file_path=file_key,
             content_hash=content_hash,
             last_processed=datetime.now().isoformat(),
-            event_count=event_count,
+            entity_count=len(entities),
+            relationship_count=len(relationships),
             task_id=metadata["task_id"],
             chapter=metadata["chapter"],
         )
         self._save_tracking()
 
         return {
-            "events": events,
+            "entities": entities,
+            "relationships": relationships,
             "task_id": metadata["task_id"],
             "chapter": metadata["chapter"],
             "file_path": file_key,
@@ -313,7 +296,7 @@ class IncrementalEventExtractor:
         force: bool = False,
     ) -> List[Dict[str, Any]]:
         """
-        Extract events from all dialogue files in a folder.
+        Extract KG from all dialogue files in a folder.
 
         Args:
             folder_path: Path to folder (e.g., Data/Archon/1608)
@@ -329,7 +312,7 @@ class IncrementalEventExtractor:
             print(f"Processing: {file_path.name}...")
             result = self.extract_file(file_path, force=force)
             results.append(result)
-            print(f"  Extracted {len(result['events'])} events")
+            print(f"  Extracted {len(result['entities'])} entities, {len(result['relationships'])} relationships")
 
         return results
 
@@ -340,7 +323,7 @@ class IncrementalEventExtractor:
         force: bool = False,
     ) -> List[Dict[str, Any]]:
         """
-        Extract events from all dialogue files.
+        Extract KG from all dialogue files.
 
         Args:
             data_dir: Root data directory
@@ -379,19 +362,24 @@ class IncrementalEventExtractor:
             print(f"Processing: {file_path}...")
             result = self.extract_file(file_path)
             results.append(result)
-            print(f"  Extracted {len(result['events'])} events")
+            print(f"  Extracted {len(result['entities'])} entities, {len(result['relationships'])} relationships")
 
         return results
 
     def get_status(self) -> Dict[str, Any]:
         """Get extraction status."""
+        total_entities = sum(info.entity_count for info in self.tracking.values())
+        total_rels = sum(info.relationship_count for info in self.tracking.values())
         return {
             "tracked_files": len(self.tracking),
+            "total_entities": total_entities,
+            "total_relationships": total_rels,
             "cache_stats": self.cache.get_stats(),
             "files": [
                 {
                     "path": info.file_path,
-                    "events": info.event_count,
+                    "entities": info.entity_count,
+                    "relationships": info.relationship_count,
                     "task_id": info.task_id,
                     "chapter": info.chapter,
                     "last_processed": info.last_processed,
@@ -409,9 +397,6 @@ class IncrementalEventExtractor:
     def cleanup_orphan_cache(self, dry_run: bool = False) -> Dict[str, Any]:
         """
         Remove cache files that are not referenced in tracking.
-
-        Cache files are content-addressed by MD5 hash. This method removes
-        any cache file whose hash is not in the current tracking info.
 
         Args:
             dry_run: If True, only report what would be deleted
@@ -433,7 +418,6 @@ class IncrementalEventExtractor:
             if cache_file.name == tracking_filename:
                 continue
 
-            # Cache filename is {hash}.json
             file_hash = cache_file.stem
 
             if file_hash not in valid_hashes:
@@ -461,6 +445,11 @@ class IncrementalEventExtractor:
 
         This is faster than re-extracting when cache files exist but tracking
         was lost (e.g., due to race conditions or manual deletion).
+
+        For each dialogue file:
+        1. Compute content hash
+        2. Check if cache file exists with that hash
+        3. If yes, load cache and update tracking
 
         Args:
             data_dir: Root data directory to scan
@@ -502,16 +491,17 @@ class IncrementalEventExtractor:
             stats["cache_hits"] += 1
             metadata = self._parse_file_metadata(file_path)
 
-            self.tracking[file_key] = EventFileTrackingInfo(
+            self.tracking[file_key] = KGFileTrackingInfo(
                 file_path=file_key,
                 content_hash=content_hash,
                 last_processed=datetime.now().isoformat(),
-                event_count=len(cached.events),
+                entity_count=len(cached.entities),
+                relationship_count=len(cached.relationships),
                 task_id=metadata["task_id"],
                 chapter=metadata["chapter"],
             )
 
-            print(f"  Restored: {file_path.name} ({len(cached.events)} events)")
+            print(f"  Restored: {file_path.name} ({len(cached.entities)} entities)")
 
         # Save tracking
         self._save_tracking()
@@ -519,15 +509,15 @@ class IncrementalEventExtractor:
         return stats
 
 
-def write_events_to_graph(
+def write_kg_to_graph(
     extraction_results: List[Dict[str, Any]],
     dry_run: bool = False,
 ) -> Dict[str, int]:
     """
-    Write extracted events to the Neo4j graph.
+    Write extracted KG to the Neo4j graph.
 
     Args:
-        extraction_results: List of extraction results from IncrementalEventExtractor
+        extraction_results: List of extraction results from IncrementalKGExtractor
         dry_run: If True, don't actually write to graph
 
     Returns:
@@ -536,66 +526,94 @@ def write_events_to_graph(
     from ..graph.builder import GraphBuilder
 
     stats = {
-        "total_events": 0,
-        "events_written": 0,
+        "total_entities": 0,
+        "total_relationships": 0,
+        "entities_written": 0,
+        "relationships_written": 0,
         "files_processed": 0,
     }
 
     if dry_run:
         for result in extraction_results:
-            stats["total_events"] += len(result["events"])
+            stats["total_entities"] += len(result["entities"])
+            stats["total_relationships"] += len(result["relationships"])
             stats["files_processed"] += 1
         return stats
 
     with GraphBuilder() as builder:
-        # Ensure schema is set up
         builder.setup_schema()
 
         for result in extraction_results:
-            events = result["events"]
+            entities = result["entities"]
+            relationships = result["relationships"]
             chapter = result["chapter"]
             task_id = result["task_id"]
 
             # Convert Pydantic models to dicts
-            event_dicts = [e.model_dump() for e in events]
+            entity_dicts = [e.model_dump() for e in entities]
+            rel_dicts = [r.model_dump() for r in relationships]
 
-            count = builder.ingest_extracted_events(
-                events=event_dicts,
-                chapter=chapter,
-                task_id=task_id,
-            )
+            # Write entities
+            for entity in entity_dicts:
+                entity_type = entity.get("entity_type", "Character")
+                if entity_type == "Character":
+                    builder.create_character_simple(
+                        name=entity["name"],
+                        task_id=task_id,
+                        chapter=chapter,
+                    )
+                    stats["entities_written"] += 1
+                elif entity_type == "Organization":
+                    builder.create_organization(
+                        name=entity["name"],
+                        task_id=task_id,
+                    )
+                    stats["entities_written"] += 1
 
-            stats["total_events"] += len(events)
-            stats["events_written"] += count
+            # Write relationships
+            for rel in rel_dicts:
+                success = builder.create_relationship(
+                    source=rel["source"],
+                    target=rel["target"],
+                    relation_type=rel["relation_type"],
+                    chapter=chapter,
+                    task_id=task_id,
+                    description=rel.get("description"),
+                    evidence=rel.get("evidence"),
+                )
+                if success:
+                    stats["relationships_written"] += 1
+
+            stats["total_entities"] += len(entities)
+            stats["total_relationships"] += len(relationships)
             stats["files_processed"] += 1
 
     return stats
 
 
 # =============================================================================
-# CLI for testing
+# CLI
 # =============================================================================
 
 if __name__ == "__main__":
     import sys
 
-    print("Incremental Event Extractor")
+    print("Incremental KG Extractor")
     print("=" * 60)
 
-    # Check command line args
     if len(sys.argv) < 2:
         print("Usage:")
-        print("  python -m src.ingestion.incremental_event_extractor <folder>")
-        print("  python -m src.ingestion.incremental_event_extractor Data/Archon/1608")
-        print("  python -m src.ingestion.incremental_event_extractor Data/Archon/1608 --write")
-        print("  python -m src.ingestion.incremental_event_extractor --cleanup")
-        print("  python -m src.ingestion.incremental_event_extractor --cleanup --dry-run")
-        print("  python -m src.ingestion.incremental_event_extractor --rebuild Data/")
-        print("  python -m src.ingestion.incremental_event_extractor --status")
+        print("  python -m src.ingestion.incremental_kg_extractor <folder>")
+        print("  python -m src.ingestion.incremental_kg_extractor Data/Archon/1608")
+        print("  python -m src.ingestion.incremental_kg_extractor Data/Archon/1608 --write")
+        print("  python -m src.ingestion.incremental_kg_extractor --cleanup")
+        print("  python -m src.ingestion.incremental_kg_extractor --cleanup --dry-run")
+        print("  python -m src.ingestion.incremental_kg_extractor --rebuild Data/")
+        print("  python -m src.ingestion.incremental_kg_extractor --status")
         sys.exit(1)
 
     # Initialize extractor
-    extractor = IncrementalEventExtractor()
+    extractor = IncrementalKGExtractor()
 
     # Handle special commands
     if "--rebuild" in sys.argv:
@@ -639,10 +657,12 @@ if __name__ == "__main__":
     if "--status" in sys.argv:
         status = extractor.get_status()
         print(f"\nTracked files: {status['tracked_files']}")
+        print(f"Total entities: {status['total_entities']}")
+        print(f"Total relationships: {status['total_relationships']}")
         print(f"Cache stats: {status['cache_stats']}")
         print(f"\nFiles:")
         for f in status['files']:
-            print(f"  {f['path']}: {f['events']} events (chapter {f['chapter']})")
+            print(f"  {f['path']}: {f['entities']} entities, {f['relationships']} rels (chapter {f['chapter']})")
         sys.exit(0)
 
     folder = Path(sys.argv[1])
@@ -652,42 +672,56 @@ if __name__ == "__main__":
         print(f"Error: Folder not found: {folder}")
         sys.exit(1)
 
-    # Extract events
-    print(f"\nExtracting events from: {folder}")
+    # Extract KG
+    print(f"\nExtracting KG from: {folder}")
     results = extractor.extract_folder(folder)
 
     # Print summary
-    total_events = sum(len(r["events"]) for r in results)
+    total_entities = sum(len(r["entities"]) for r in results)
+    total_rels = sum(len(r["relationships"]) for r in results)
     print(f"\n{'='*60}")
     print(f"SUMMARY")
     print(f"{'='*60}")
     print(f"Files processed: {len(results)}")
-    print(f"Total events extracted: {total_events}")
+    print(f"Total entities: {total_entities}")
+    print(f"Total relationships: {total_rels}")
 
-    # Print events by type
-    type_counts: Dict[str, int] = {}
+    # Count entity types
+    entity_types: Dict[str, int] = {}
     for result in results:
-        for event in result["events"]:
-            t = event.event_type
-            type_counts[t] = type_counts.get(t, 0) + 1
+        for entity in result["entities"]:
+            t = entity.entity_type
+            entity_types[t] = entity_types.get(t, 0) + 1
 
-    print(f"\nEvent type distribution:")
-    for t, count in sorted(type_counts.items(), key=lambda x: -x[1]):
+    print(f"\nEntity types:")
+    for t, count in sorted(entity_types.items(), key=lambda x: -x[1]):
         print(f"  {t}: {count}")
 
-    # Print sample events
-    print(f"\nSample events:")
-    for result in results[:2]:
+    # Count relationship types
+    rel_types: Dict[str, int] = {}
+    for result in results:
+        for rel in result["relationships"]:
+            t = rel.relation_type
+            rel_types[t] = rel_types.get(t, 0) + 1
+
+    print(f"\nRelationship types:")
+    for t, count in sorted(rel_types.items(), key=lambda x: -x[1]):
+        print(f"  {t}: {count}")
+
+    # Print sample
+    print(f"\nSample entities:")
+    for result in results[:1]:
         print(f"\n  File: {result['file_path']}")
-        for event in result["events"][:3]:
-            print(f"    [{event.event_type}] {event.name}")
-            print(f"      Summary: {event.summary[:60]}...")
+        for entity in result["entities"][:5]:
+            role_str = f" ({entity.role})" if entity.role else ""
+            print(f"    [{entity.entity_type}] {entity.name}{role_str}")
 
     # Write to graph if requested
     if write_to_graph:
         print(f"\n{'='*60}")
-        print("Writing events to Neo4j graph...")
-        stats = write_events_to_graph(results)
-        print(f"Events written: {stats['events_written']}")
+        print("Writing KG to Neo4j graph...")
+        stats = write_kg_to_graph(results)
+        print(f"Entities written: {stats['entities_written']}")
+        print(f"Relationships written: {stats['relationships_written']}")
     else:
-        print(f"\nTo write events to graph, run with --write flag")
+        print(f"\nTo write KG to graph, run with --write flag")

@@ -2,12 +2,12 @@
 Verify the Neo4j knowledge graph integrity and test queries.
 
 Usage:
-    python -m scripts.verify_graph
+    python -m tests.integration.verify_graph
 """
 
-from ..graph.connection import Neo4jConnection
-from ..graph.builder import GraphBuilder
-from ..graph.searcher import GraphSearcher
+from src.graph.connection import Neo4jConnection
+from src.graph.builder import GraphBuilder
+from src.graph.searcher import GraphSearcher
 
 
 def verify_schema(conn: Neo4jConnection) -> bool:

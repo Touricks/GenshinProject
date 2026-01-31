@@ -160,7 +160,12 @@ class GraphSearcher:
     def _resolve_canonical_name(self, entity_name: str) -> str:
         """
         Resolve an entity name (or alias) to its canonical name using the fulltext index.
-        Prioritizes nodes with populated aliases (Seed Characters) over raw extracted nodes.
+
+        Resolution priority:
+        1. Exact name match (case-insensitive)
+        2. High-score match (score > 3.0) - indicates strong relevance
+        3. Alias match with reasonable score (score > 1.5)
+        4. Top result as fallback
         """
         # Try fulltext search on Character index (ADR-006)
         query = """
@@ -172,16 +177,27 @@ class GraphSearcher:
         try:
             results = self.conn.execute(query, {"name": entity_name})
 
-            # Strategy: Prefer nodes that have aliases (implies Seed/Main Character)
-            # 1. Look for match with aliases
-            for res in results:
-                if res.get("aliases") and len(res["aliases"]) > 0:
-                     return res["name"]
+            if not results:
+                return entity_name
 
-            # 2. Fallback to top score if score is high enough (e.g. > 0.8)
-            # For now we accept any match returned by Lucene as better than nothing
-            if results:
-                 return results[0]["name"]
+            # Priority 1: Exact name match (highest priority)
+            for res in results:
+                if res["name"] == entity_name:
+                    return res["name"]
+
+            # Priority 2: High-score match (score > 3.0 indicates strong relevance)
+            top_result = results[0]
+            if top_result["score"] > 3.0:
+                return top_result["name"]
+
+            # Priority 3: Check if input is an alias of a node (with reasonable score)
+            for res in results:
+                aliases = res.get("aliases") or []
+                if entity_name in aliases and res["score"] > 1.5:
+                    return res["name"]
+
+            # Priority 4: Fallback to top score result
+            return top_result["name"]
 
         except Exception:
             # Index might not exist or other error, fallback

@@ -44,14 +44,24 @@ REFINER_PROMPT = """你是一个查询分解专家。当向量搜索未能找到
 class QueryRefiner:
     """Decompose complex questions into multiple targeted search queries."""
 
-    def __init__(self, llm):
+    def __init__(self, llm=None):
         """
         Initialize QueryRefiner.
 
         Args:
-            llm: LlamaIndex LLM instance (should be a fast model like gemini-2.5-flash)
+            llm: Optional LlamaIndex LLM instance. If None, uses GRADER_MODEL
+                 (a fast model like gemini-2.5-flash for speed priority).
         """
-        self.llm = llm
+        if llm is not None:
+            self.llm = llm
+        else:
+            # Use fast GRADER_MODEL by default
+            from llama_index.llms.google_genai import GoogleGenAI
+            from ..config import settings
+            self.llm = GoogleGenAI(
+                model=settings.GRADER_MODEL,
+                is_function_calling_model=False,
+            )
 
     async def refine(self, question: str, suggestion: str = "") -> List[str]:
         """

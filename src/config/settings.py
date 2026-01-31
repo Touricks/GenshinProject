@@ -31,15 +31,21 @@ class Settings(BaseSettings):
     RERANKER_MODEL: str = "jinaai/jina-reranker-v2-base-multilingual"
     RERANKER_TOP_K: int = 5
 
-    # LLM settings (for Agent)
-    # 支持两种命名方式: LLM_MODEL/GEMINI_MODEL, GOOGLE_API_KEY/GEMINI_API_KEY
-    LLM_MODEL: Optional[str] = None
-    GEMINI_MODEL: Optional[str] = None
+    # LLM settings - Three model categories
+    # REASONING_MODEL: 主 Agent 推理、工具编排 (需要强推理能力)
+    REASONING_MODEL: Optional[str] = None
+    # GRADER_MODEL: 答案质量评分、Query 改写 (快速模型)
+    GRADER_MODEL: Optional[str] = None
+    # DATA_MODEL: 结构化输出 (KG/Event 提取)
+    DATA_MODEL: Optional[str] = None
+
+    # API Key settings
     GOOGLE_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
 
-    # Grader/Refiner 使用轻量模型 (速度优先)
-    GRADER_MODEL: Optional[str] = None
+    # Backward compatibility aliases (deprecated)
+    LLM_MODEL: Optional[str] = None
+    GEMINI_MODEL: Optional[str] = None
 
     # Chunking settings
     MAX_CHUNK_SIZE: int = 1500
@@ -65,17 +71,26 @@ class Settings(BaseSettings):
             else:
                 self.QDRANT_HOST = url
 
-        # Resolve LLM_MODEL: prefer LLM_MODEL, fallback to GEMINI_MODEL
-        if not self.LLM_MODEL:
-            self.LLM_MODEL = self.GEMINI_MODEL or "gemini-2.5-flash"
-
         # Resolve GOOGLE_API_KEY: prefer GOOGLE_API_KEY, fallback to GEMINI_API_KEY
         if not self.GOOGLE_API_KEY:
             self.GOOGLE_API_KEY = self.GEMINI_API_KEY
 
-        # Resolve GRADER_MODEL: default to gemini-2.5-flash for speed
+        # Resolve REASONING_MODEL (main agent)
+        if not self.REASONING_MODEL:
+            # Fallback chain: LLM_MODEL -> GEMINI_MODEL -> default
+            self.REASONING_MODEL = self.LLM_MODEL or self.GEMINI_MODEL or "gemini-2.5-flash"
+
+        # Resolve GRADER_MODEL (fast model for grading/refinement)
         if not self.GRADER_MODEL:
             self.GRADER_MODEL = "gemini-2.5-flash"
+
+        # Resolve DATA_MODEL (structured output for extraction)
+        if not self.DATA_MODEL:
+            self.DATA_MODEL = "gemini-2.5-flash"
+
+        # Backward compatibility: LLM_MODEL points to REASONING_MODEL
+        if not self.LLM_MODEL:
+            self.LLM_MODEL = self.REASONING_MODEL
 
         return self
 

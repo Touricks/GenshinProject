@@ -176,14 +176,14 @@ class LLMKnowledgeGraphExtractor:
         Initialize the LLM extractor.
 
         Args:
-            model: Model name (defaults to GEMINI_MODEL env var)
+            model: Model name (defaults to DATA_MODEL from settings)
             api_key: API key (defaults to GEMINI_API_KEY env var)
         """
-        from llama_index.llms.openai_like import OpenAILike
+        from llama_index.llms.google_genai import GoogleGenAI
         from .entity_normalizer import EntityNormalizer
+        from ..config import settings
 
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-        api_base = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+        self.model = model or settings.DATA_MODEL
 
         # Try GEMINI_API_KEY first, then GOOGLE_API_KEY
         api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -191,12 +191,10 @@ class LLMKnowledgeGraphExtractor:
         if not api_key:
             raise ValueError("GEMINI_API_KEY or GOOGLE_API_KEY environment variable is required")
 
-        self.llm = OpenAILike(
+        # Use native Google GenAI LLM for schema-enforced structured output
+        self.llm = GoogleGenAI(
             model=self.model,
-            api_base=api_base,
             api_key=api_key,
-            is_chat_model=True,
-            context_window=32000,
         )
         self.structured_llm = self.llm.as_structured_llm(KnowledgeGraphOutput)
         self.normalizer = EntityNormalizer()

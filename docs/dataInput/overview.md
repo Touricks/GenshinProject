@@ -18,7 +18,7 @@
               ┌─────────────────────────────────────┐             ┌─────────────────────────────────────┐
               │       Vector Pipeline (Track 1)      │             │       Graph Pipeline (Track 2)       │
               │                                      │             │                                      │
-              │  IncrementalIngestionPipeline        │             │  IncrementalKGExtractor             │
+              │  IncrementalIngestionPipeline        │             │  LLMKGExtractor + GraphBuilder       │
               │  ├─ Change Detection (MD5)           │             │  ├─ Change Detection (MD5)          │
               │  ├─ Load & Chunk                     │             │  ├─ LLM Entity/Relation Extraction  │
               │  ├─ Embed (BAAI/bge-base-zh-v1.5)    │             │  ├─ Entity Normalization            │
@@ -53,7 +53,7 @@
 | **EntityNormalizer** | `src/ingestion/entity_normalizer.py` | Alias-to-canonical name mapping |
 | **CharacterValidator** | `src/ingestion/character_validator.py` | Filter invalid character names |
 | **GraphBuilder** | `src/graph/builder.py` | Neo4j node/edge creation |
-| **KGMerger** | `src/ingestion/incremental_extractor.py` | Deduplicate extracted entities/relations |
+| **GraphBuilder** | `src/graph/builder.py` | Neo4j node/edge creation with deduplication |
 
 ---
 
@@ -90,10 +90,10 @@ Dialogue File → LLM Extract → Normalize → Dedupe → Neo4j
 1. **Change Detection**: Compare MD5 hash with `.cache/kg/tracking.json`
 2. **Extract**: LLM extracts entities and relationships
 3. **Normalize**: Map aliases to canonical names via EntityNormalizer
-4. **Dedupe**: KGMerger removes duplicate entities/relations
+4. **Dedupe**: GraphBuilder handles duplicate entities/relations via MERGE
 5. **Write**: GraphBuilder creates/updates Neo4j nodes and edges
 
-**Reference**: [graph-incremental-api.md](./graph-incremental-api.md)
+**Reference**: See `src/scripts/build_graph.py` for implementation
 
 ---
 
@@ -129,28 +129,17 @@ vector_pipeline = IngestionPipeline(data_dir=Path("Data/"))
 stats = vector_pipeline.run()
 print(f"Indexed {stats.chunks_indexed} chunks")
 
-# 2. Graph Pipeline (Full)
-from src.ingestion.incremental_extractor import IncrementalKGExtractor
-from src.graph.builder import GraphBuilder
-from src.models.relationships import Relationship, RelationType
+# 2. Graph Pipeline (Full) - Use CLI script
+# python -m src.scripts.build_graph --clear
 
-kg_extractor = IncrementalKGExtractor()
-kg = kg_extractor.extract_incremental(Path("Data/"))
+# Or programmatically:
+from src.graph.builder import GraphBuilder
 
 with GraphBuilder() as builder:
     builder.setup_schema()
-    # Create Character nodes
-    char_names = {e.name for e in kg.entities if e.entity_type == "Character"}
-    builder.create_characters_batch(char_names)
-    # Convert ExtractedRelationship -> Relationship and create edges
-    for rel in kg.relationships:
-        relationship = Relationship(
-            source=rel.source,
-            target=rel.target,
-            rel_type=RelationType[rel.relation_type],
-            properties={"description": rel.description, "evidence": rel.evidence},
-        )
-        builder.create_relationship(relationship)
+    builder.create_seed_organizations()
+    builder.create_seed_characters()
+    # See src/scripts/build_graph.py for full pipeline
 ```
 
 ### Incremental Update
@@ -223,6 +212,5 @@ docker run -p 6333:6333 qdrant/qdrant
 | Document | Description |
 |----------|-------------|
 | [vector-incremental-pipeline.md](./vector-incremental-pipeline.md) | Qdrant incremental ingestion details |
-| [graph-incremental-api.md](./graph-incremental-api.md) | Neo4j write API reference |
 | [event-extraction-pipeline.md](./event-extraction-pipeline.md) | MajorEvent extraction pipeline |
 | [entity-normalization.md](./entity-normalization.md) | Alias mapping and character validation |

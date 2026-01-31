@@ -1,7 +1,7 @@
 """
 Data ingestion pipeline for processing dialogue files.
 
-This module provides:
+Vector Pipeline:
 - DocumentLoader: Parse dialogue files from Data/ directory
 - SceneChunker: Scene-based semantic chunking
 - MetadataEnricher: Extract characters and compute metadata
@@ -9,17 +9,14 @@ This module provides:
 - VectorIndexer: Index to Qdrant vector database
 - JinaReranker: Rerank search results using Jina Reranker v2
 - IngestionPipeline: Orchestrate the full pipeline
-- EntityExtractor: Extract entities for graph building (regex-based)
-- RelationExtractor: Extract relationships for graph building
 
-LLM-based Knowledge Graph Extraction:
+Graph Pipeline:
 - LLMKnowledgeGraphExtractor: LLM-based entity/relationship extraction
-- KnowledgeGraphOutput: Pydantic model for KG extraction results
-- ExtractedEntity, ExtractedRelationship: Pydantic models for extracted data
-- KGCache, CachedKGExtractor: Caching layer for LLM extraction
-- IncrementalKGExtractor, KGMerger: Incremental extraction with deduplication
-- KGSnapshotManager: Versioned KG snapshots
+- LLMEventExtractor: LLM-based major event extraction
+- IncrementalKGExtractor: Incremental KG extraction with caching
+- IncrementalEventExtractor: Incremental event extraction with caching
 - CharacterValidator: Data quality validation for character names
+- EntityNormalizer: Alias to canonical name mapping
 """
 
 from .loader import DocumentLoader
@@ -29,8 +26,6 @@ from .embedder import EmbeddingGenerator
 from .indexer import VectorIndexer
 from .reranker import JinaReranker
 from .pipeline import IngestionPipeline, run_pipeline
-from .entity_extractor import EntityExtractor, extract_all_entities
-from .relation_extractor import RelationExtractor, get_seed_relationships
 
 # LLM-based KG extraction
 from .llm_kg_extractor import (
@@ -41,13 +36,8 @@ from .llm_kg_extractor import (
     extract_kg_from_text,
     extract_kg_from_file,
 )
-from .kg_cache import KGCache, CachedKGExtractor
-from .incremental_extractor import (
-    IncrementalKGExtractor,
-    KGMerger,
-    FileTrackingInfo,
-)
-from .kg_snapshot import KGSnapshotManager
+
+# Data quality validation
 from .character_validator import (
     CharacterValidator,
     InvalidReason,
@@ -55,6 +45,9 @@ from .character_validator import (
     validate_character_name,
     filter_character_names,
 )
+
+# Entity normalization
+from .entity_normalizer import EntityNormalizer
 
 # LLM-based Event extraction
 from .event_extractor import (
@@ -72,6 +65,12 @@ from .incremental_event_extractor import (
     EventFileTrackingInfo,
     write_events_to_graph,
 )
+from .incremental_kg_extractor import (
+    IncrementalKGExtractor,
+    KGCache,
+    KGFileTrackingInfo,
+    write_kg_to_graph,
+)
 
 __all__ = [
     # Vector DB pipeline
@@ -83,11 +82,6 @@ __all__ = [
     "JinaReranker",
     "IngestionPipeline",
     "run_pipeline",
-    # Regex-based extraction
-    "EntityExtractor",
-    "RelationExtractor",
-    "extract_all_entities",
-    "get_seed_relationships",
     # LLM-based KG extraction
     "LLMKnowledgeGraphExtractor",
     "KnowledgeGraphOutput",
@@ -95,18 +89,14 @@ __all__ = [
     "ExtractedRelationship",
     "extract_kg_from_text",
     "extract_kg_from_file",
-    "KGCache",
-    "CachedKGExtractor",
-    "IncrementalKGExtractor",
-    "KGMerger",
-    "FileTrackingInfo",
-    "KGSnapshotManager",
     # Data quality validation
     "CharacterValidator",
     "InvalidReason",
     "ValidationResult",
     "validate_character_name",
     "filter_character_names",
+    # Entity normalization
+    "EntityNormalizer",
     # LLM-based Event extraction
     "LLMEventExtractor",
     "EventExtractionOutput",
@@ -120,4 +110,9 @@ __all__ = [
     "EventCache",
     "EventFileTrackingInfo",
     "write_events_to_graph",
+    # Incremental KG extraction
+    "IncrementalKGExtractor",
+    "KGCache",
+    "KGFileTrackingInfo",
+    "write_kg_to_graph",
 ]
