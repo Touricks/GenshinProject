@@ -70,16 +70,19 @@ class AgentTracer:
         logger.info(f"[Tracer] Started trace: {trace_id}")
         return trace_id
 
-    def start_attempt(self, attempt: int, limit: int):
+    def start_attempt(self, attempt: int, limit: int, input_query: str = None):
         """Start tracking a new attempt.
 
         Args:
             attempt: Attempt number (1-based).
             limit: Current search_memory limit.
+            input_query: The actual query sent to the agent (may include injected context).
         """
         self.current_attempt = {
             "attempt": attempt,
             "limit": limit,
+            "input_query": input_query,  # 记录发送给 Agent 的完整 query
+            "context_from_previous": None,  # 上下文摘要（由 log_context_injection 填充）
             "tool_calls": [],
             "reasoning": {
                 "raw_stream": "",  # Full reasoning stream
@@ -94,6 +97,23 @@ class AgentTracer:
         }
         self._reasoning_buffer = ""
         logger.debug(f"[Tracer] Started attempt {attempt} with limit={limit}")
+
+    def log_context_injection(self, context_summary: Dict[str, Any]):
+        """Log the structured context injected from previous attempts.
+
+        Args:
+            context_summary: Summary of what was injected, e.g.:
+                {
+                    "from_attempt": 1,
+                    "tool_summary": "find_connection → PARTNER_OF",
+                    "grade_summary": {"score": 65, "depth": 5},
+                    "refiner_queries": [...]
+                }
+        """
+        if self.current_attempt is None:
+            return
+        self.current_attempt["context_from_previous"] = context_summary
+        logger.debug(f"[Tracer] Context injected from attempts {context_summary.get('from_attempts')}")
 
     def log_tool_call(
         self,

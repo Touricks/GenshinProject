@@ -87,6 +87,7 @@ class GenshinRetrievalAgent:
         self._refiner = None
         self._current_limit = 5  # Default limit for search_memory
         self._tracer = AgentTracer()  # Full chain tracer for debugging
+        self._pending_context_summary = None  # 用于在下一轮 trace 中记录上下文
 
     def _ensure_initialized(self):
         """Ensure the agent is initialized (lazy loading)."""
@@ -374,6 +375,7 @@ class GenshinRetrievalAgent:
         tool_calls_history = []
         answer = ""
         passed = False
+        self._pending_context_summary = None  # 重置上下文摘要
 
         for attempt in range(1, max_retries + 1):
             # Set progressive limit
@@ -382,8 +384,13 @@ class GenshinRetrievalAgent:
 
             logger.info(f"Attempt {attempt}/{max_retries} with limit={current_limit}")
 
-            # Start attempt trace
-            self._tracer.start_attempt(attempt, current_limit)
+            # Start attempt trace (记录发送给 Agent 的完整 query)
+            self._tracer.start_attempt(attempt, current_limit, input_query=current_query)
+
+            # 如果有上一轮的上下文摘要，记录到当前 attempt
+            if self._pending_context_summary is not None:
+                self._tracer.log_context_injection(self._pending_context_summary)
+                self._pending_context_summary = None
 
             # Run ReAct agent
             handler = self._agent.run(current_query, ctx=self._ctx)
@@ -519,6 +526,22 @@ class GenshinRetrievalAgent:
 
                 # Reset context for fresh attempt
                 self.reset_context()
+
+                # 为下一轮的 trace 准备上下文摘要
+                # (会在下一轮 start_attempt 后立即记录)
+                self._pending_context_summary = {
+                    "from_attempts": [a["attempt"] for a in attempts_history],
+                    "last_tool_summary": self._summarize_tool_output(
+                        attempt_tool_calls[0]["tool"],
+                        attempt_tool_calls[0]["output"]
+                    ) if attempt_tool_calls else None,
+                    "last_grade_summary": {
+                        "score": grade_result.get("score"),
+                        "depth": grade_result.get("scores", {}).get("depth"),
+                        "fail_reason": grade_result.get("fail_reason"),
+                    },
+                    "refiner_queries": refined_queries,
+                }
             else:
                 # Last attempt, just end trace
                 self._tracer.end_attempt(answer)
