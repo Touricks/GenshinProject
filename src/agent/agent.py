@@ -11,8 +11,9 @@ Features:
 
 import logging
 import os
+import re
 import time
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict, Any
 
 from ..config import Settings
 from .prompts import SYSTEM_PROMPT
@@ -207,6 +208,62 @@ class GenshinRetrievalAgent:
         self._current_limit = limit
         logger.debug(f"search_memory limit set to {limit}")
 
+    def _summarize_tool_output(self, tool: str, output: str) -> str:
+        """提取 tool output 的结论摘要，不包含 chunk 原文。"""
+        if tool == "find_connection":
+            # 提取关系类型，如 "PARTNER_OF"
+            match = re.search(r'-\[(\w+)\]->', output)
+            return match.group(1) if match else "已找到关系"
+        elif tool in ("search_memory", "search_memory_with_limit"):
+            # 只返回结果数量，不返回 chunk 内容
+            result_count = output.count("### 结果")
+            return f"返回 {result_count} 个相关片段"
+        elif tool == "lookup_knowledge":
+            return "已返回实体信息"
+        elif tool == "get_character_events":
+            # 提取事件数量
+            event_count = output.count("**")
+            return f"返回 {event_count // 2} 个事件"
+        elif tool == "track_journey":
+            return "已返回时间线"
+        else:
+            return "已执行"
+
+    def _build_attempt_context(self, attempt_data: Dict[str, Any]) -> str:
+        """构建上一轮尝试的 Markdown 上下文。"""
+        # 构建工具调用摘要
+        tool_calls_md = []
+        for tc in attempt_data.get("tool_calls", []):
+            summary = self._summarize_tool_output(tc["tool"], tc["output"])
+            kwargs_str = ", ".join(f"{k}={v}" for k, v in tc["kwargs"].items())
+            tool_calls_md.append(f"- **{tc['tool']}**({kwargs_str}) → {summary}")
+
+        grade = attempt_data.get("grade", {})
+        scores = grade.get("scores", {})
+        refiner = attempt_data.get("refiner_queries", [])
+
+        # 截断答案
+        answer = attempt_data.get("answer", "")
+        if len(answer) > 150:
+            answer = answer[:150] + "..."
+
+        return f"""## 上一轮尝试 (Attempt {attempt_data['attempt']})
+
+### 工具调用
+{chr(10).join(tool_calls_md) if tool_calls_md else "(无)"}
+
+### 回答
+{answer}
+
+### 评分结果
+- 总分: {grade.get('score', 0)}/100, 深度: {scores.get('depth', 0)}/20
+- 失败原因: {grade.get('fail_reason', '')}
+- 改进建议: {grade.get('suggestion', '')}
+
+### Refiner 建议搜索
+{', '.join(f'"{q}"' for q in refiner) if refiner else '(无)'}
+"""
+
     async def run(self, query: str) -> str:
         """
         Run a single query (stateless).
@@ -312,6 +369,7 @@ class GenshinRetrievalAgent:
         })
 
         grading_history = []
+        attempts_history = []  # 结构化历史，用于上下文传递
         current_query = query
         tool_calls_history = []
         answer = ""
@@ -426,27 +484,38 @@ class GenshinRetrievalAgent:
                     except Exception as e:
                         logger.warning(f"Refiner failed: {e}")
 
+                # 收集本轮数据用于结构化上下文
+                attempt_data = {
+                    "attempt": attempt,
+                    "tool_calls": attempt_tool_calls,
+                    "answer": answer,
+                    "grade": grade_result,
+                    "refiner_queries": refined_queries,
+                }
+                attempts_history.append(attempt_data)
+
                 # End attempt trace after refiner logging
                 self._tracer.end_attempt(answer)
 
-                # Build retry prompt with Refiner suggestions
-                # 强调必须使用 search_memory，不要重复使用 find_connection
-                if refined_queries:
-                    queries_hint = ", ".join(f'"{q}"' for q in refined_queries)
-                    current_query = (
-                        f"{query}\n\n"
-                        f"[系统提示: 上次答案深度不足（depth<8）。\n"
-                        f"原因: 只调用了 find_connection，缺少具体剧情内容。\n"
-                        f"要求: 必须调用 search_memory 搜索以下关键词获取故事原文: {queries_hint}。\n"
-                        f"不要再次调用 find_connection，它已经无法提供更多信息。]"
-                    )
-                else:
-                    current_query = (
-                        f"{query}\n\n"
-                        f"[系统提示: 上次答案深度不足 (尝试 {attempt}/{max_retries})。\n"
-                        f"改进建议: {suggestion}\n"
-                        f"要求: 必须调用 search_memory 搜索具体剧情/对话内容，提高答案深度。]"
-                    )
+                # 构建结构化历史上下文
+                history_context = "\n---\n".join(
+                    self._build_attempt_context(a) for a in attempts_history
+                )
+
+                # 构建重试 prompt，包含完整历史上下文
+                queries_hint = ", ".join(f'"{q}"' for q in refined_queries) if refined_queries else ""
+                current_query = f"""{history_context}
+
+---
+
+## 当前任务
+{query}
+
+**重要**: 根据上述历史：
+1. 不要重复调用已经调用过的工具（结果相同）
+2. 必须调用 search_memory 获取故事原文增加深度
+{f"3. 建议搜索关键词: {queries_hint}" if queries_hint else ""}
+"""
 
                 # Reset context for fresh attempt
                 self.reset_context()
