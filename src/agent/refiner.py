@@ -81,7 +81,7 @@ class QueryRefiner:
 
         try:
             response = await self.llm.acomplete(prompt)
-            response_text = response.text.strip()
+            response_text = str(response).strip()
 
             # Extract JSON array from response
             # Handle cases where model might wrap it in markdown code blocks

@@ -396,12 +396,11 @@ class GenshinRetrievalAgent:
                 + (f" ({fail_reason})" if fail_reason else "")
             )
 
-            # End attempt trace
-            self._tracer.end_attempt(answer)
-
             # Check if passed (uses hard threshold logic from grader)
             if passed:
                 logger.info(f"Passed grading on attempt {attempt}")
+                # End attempt trace before break
+                self._tracer.end_attempt(answer)
                 break
 
             # Prepare for retry with Refiner suggestions
@@ -417,7 +416,7 @@ class GenshinRetrievalAgent:
                         refiner_duration = int((time.time() - refiner_start) * 1000)
                         logger.info(f"Refiner generated queries: {refined_queries}")
 
-                        # Log refiner to tracer
+                        # Log refiner to tracer (before end_attempt!)
                         self._tracer.log_refiner(
                             question=query,
                             suggestion=suggestion,
@@ -427,24 +426,33 @@ class GenshinRetrievalAgent:
                     except Exception as e:
                         logger.warning(f"Refiner failed: {e}")
 
-                # Build retry prompt with Refiner suggestions (pure hint injection)
+                # End attempt trace after refiner logging
+                self._tracer.end_attempt(answer)
+
+                # Build retry prompt with Refiner suggestions
+                # 强调必须使用 search_memory，不要重复使用 find_connection
                 if refined_queries:
                     queries_hint = ", ".join(f'"{q}"' for q in refined_queries)
                     current_query = (
                         f"{query}\n\n"
-                        f"[系统提示: 上次答案深度不足。建议搜索关键词: {queries_hint}。\n"
-                        f"可以使用 search_memory 搜索故事内容，track_journey 追踪时间线，"
-                        f"或 find_connection 查找关系。请根据问题类型选择合适的工具。]"
+                        f"[系统提示: 上次答案深度不足（depth<8）。\n"
+                        f"原因: 只调用了 find_connection，缺少具体剧情内容。\n"
+                        f"要求: 必须调用 search_memory 搜索以下关键词获取故事原文: {queries_hint}。\n"
+                        f"不要再次调用 find_connection，它已经无法提供更多信息。]"
                     )
                 else:
                     current_query = (
                         f"{query}\n\n"
-                        f"[系统提示: 上次答案不完整 (尝试 {attempt}/{max_retries}). "
-                        f"改进建议: {suggestion}]"
+                        f"[系统提示: 上次答案深度不足 (尝试 {attempt}/{max_retries})。\n"
+                        f"改进建议: {suggestion}\n"
+                        f"要求: 必须调用 search_memory 搜索具体剧情/对话内容，提高答案深度。]"
                     )
 
                 # Reset context for fresh attempt
                 self.reset_context()
+            else:
+                # Last attempt, just end trace
+                self._tracer.end_attempt(answer)
 
         # End trace and save to file
         total_duration = int((time.time() - start_time) * 1000)
