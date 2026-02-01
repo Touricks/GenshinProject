@@ -64,7 +64,6 @@ async def run_single_query(query: str, verbose: bool = False, grading: bool = Fa
             scores = grade.get('scores', {})
             print(f"  Question Type: {grade.get('question_type', '?')}")
             print(f"  Scores: tool={scores.get('tool_usage', 0)}, "
-                  f"evidence={scores.get('evidence', 0)}, "
                   f"complete={scores.get('completeness', 0)}, "
                   f"cite={scores.get('citation', 0)}, "
                   f"depth={scores.get('depth', 0)}")

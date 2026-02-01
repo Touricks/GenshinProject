@@ -265,6 +265,38 @@ class GenshinRetrievalAgent:
 {', '.join(f'"{q}"' for q in refiner) if refiner else '(无)'}
 """
 
+    async def _humanize_response(self, response: str) -> str:
+        """去引用处理，使回答更自然。
+
+        Args:
+            response: Agent 的原始回答（可能包含引用标注）。
+
+        Returns:
+            更自然的回答，移除了引用标注。
+        """
+        prompt = """你是一个文本改写助手。请将以下回答改写，移除学术化的引用格式。
+
+要求：
+1. 移除所有"(第X章，任务XXXX)"、"根据第X章"等引用标注
+2. 保留所有具体信息、对话原文和事件细节
+3. 使用平实、自然的中文表达，不要过于口语化或浮夸
+4. 不要添加"没问题"、"我来"等开场白，直接输出改写后的内容
+5. 保持原文的结构和层次
+
+原回答：
+{response}
+
+直接输出改写后的内容："""
+
+        try:
+            result = await self._llm.acomplete(prompt.format(response=response))
+            humanized = str(result).strip()
+            logger.debug(f"Humanized response: {len(response)} -> {len(humanized)} chars")
+            return humanized
+        except Exception as e:
+            logger.warning(f"Humanize failed: {e}, returning original")
+            return response
+
     async def run(self, query: str) -> str:
         """
         Run a single query (stateless).
@@ -546,16 +578,27 @@ class GenshinRetrievalAgent:
                 # Last attempt, just end trace
                 self._tracer.end_attempt(answer)
 
-        # End trace and save to file
+        # 只在通过时去引用，失败的回答保留原格式用于调试
+        humanized = None
+        if passed:
+            humanized = await self._humanize_response(answer)
+
+        # End trace and save to file (保存原格式和去引用后两种回答)
         total_duration = int((time.time() - start_time) * 1000)
-        trace_path = self._tracer.end_trace(answer, passed, total_duration)
+        trace_path = self._tracer.end_trace(
+            final_response=answer,  # 原格式
+            passed=passed,
+            total_duration_ms=total_duration,
+            humanized_response=humanized,  # 去引用后
+        )
         if trace_path:
             logger.info(f"Trace saved: {trace_path}")
 
         if not passed:
             logger.warning(f"Max retries ({max_retries}) reached, returning last answer")
 
-        return answer, grading_history
+        # 返回去引用后的回答（如果有）
+        return humanized if humanized else answer, grading_history
 
     def reset_context(self):
         """Reset the conversation context for a new session."""

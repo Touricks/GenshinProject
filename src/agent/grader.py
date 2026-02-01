@@ -12,9 +12,8 @@ from typing import List, Dict, Any
 logger = logging.getLogger(__name__)
 
 # 硬性门槛配置
-DEPTH_HARD_THRESHOLD = 8      # depth 分数必须 >= 8，否则直接不通过
+DEPTH_HARD_THRESHOLD = 10     # depth 分数必须 >= 10，否则直接不通过 (按比例调整: 8/20*25=10)
 CITATION_HARD_THRESHOLD = 0   # 禁用 citation 门槛（Agent 不会自动添加引用）
-EVIDENCE_HARD_THRESHOLD = 5   # evidence 分数必须 >= 5，配合放宽的 prompt
 SCORE_THRESHOLD = 70          # 总分阈值
 
 
@@ -39,90 +38,57 @@ GRADER_PROMPT = """你是一个答案质量评估器。请评估以下答案是�
 
 ## 评估标准
 
-请根据以下5个维度评估，每个维度0-20分：
+请根据以下4个维度评估，每个维度0-25分：
 
-1. **工具调用验证** (0-20分)
-   - 20分：调用了适当的工具验证实体/信息存在
-   - 12分：调用了工具但不够全面
-   - 5分：只调用了1次工具
+1. **工具调用验证** (0-25分)
+   - 25分：调用了多个适当的工具验证实体/信息
+   - 18分：调用了适当的工具但不够全面
+   - 10分：只调用了1次工具
    - 0分：没有调用任何工具
 
-2. **证据支持** (0-20分) - 语义验证而非逐字匹配
-
-   **验证步骤**：
-   a. 从答案中提取所有关键声明（如"X发生了Y"、"A拥有B"）
-   b. 对每个声明，检查是否与 tool output 矛盾
-   c. 只有与 tool output 直接矛盾的内容才是幻觉
-
-   **评分**：
-   - 20分：所有关键声明都能在 tool output 中找到明确支持，或不矛盾
-   - 15分：大部分声明有支持，少量无法验证但不矛盾
-   - 10分：核心声明有支持，存在一些无法验证的细节（可能因截断）
-   - 5分：只有部分声明有支持，但无明显矛盾
-   - 0分：主要声明与 tool output 直接矛盾（真正的幻觉）
-
-   **重要澄清**：
-   - 如果 tool output 提到了某个实体/事件，答案对其进行总结或重新表述不是幻觉
-   - 从多个 tool output 综合推理出的结论不是幻觉
-   - 专有名词的别名/全名使用不是幻觉（如"少女"和"露珠"可能指同一角色）
-   - 无法在截断后的 tool output 中验证、但也不矛盾的内容，应给予合理怀疑的空间
-   - 只有与 tool output 直接矛盾的内容才是幻觉
-
-3. **答案完整性** (0-20分)
-   - 20分：完整回答了问题的所有方面
-   - 12分：回答了主要方面，遗漏部分细节
-   - 5分：只部分回答了问题
+2. **答案完整性** (0-25分)
+   - 25分：完整回答了问题的所有方面
+   - 18分：回答了主要方面，遗漏部分细节
+   - 10分：只部分回答了问题
    - 0分：答案与问题无关或拒绝回答
 
-4. **来源引用** (0-20分)
-   - 20分：明确引用了 Chapter/Task ID 等来源
-   - 12分：提到了来源但不具体
-   - 5分：隐含引用但未明确
+3. **来源引用** (0-25分)
+   - 25分：明确引用了 Chapter/Task ID 等来源
+   - 18分：提到了来源但不具体
+   - 10分：隐含引用但未明确
    - 0分：没有任何来源引用
 
-5. **答案深度** (0-20分) - 特别重要！
+4. **答案深度** (0-25分) - 特别重要！
 
-   **核心原则**: 深度分数取决于是否引用了 tool output 中的**具体证据**（对话原文、事件细节）
+   **核心原则**: 深度分数取决于答案是否包含**具体证据**（对话原文、事件细节）
 
    **评分标准**:
-   - 20分：引用了 tool output 中的具体对话原文或事件细节
-   - 12分：提到了 tool output 中的关键信息点，但未直接引用原文
-   - 5分：仅复述 tool output 的摘要/标题，无具体证据
-   - 0分：答案与 tool output 无关或纯属臆测
+   - 25分：引用了具体对话原文或事件细节
+   - 18分：提到了关键信息点，但未直接引用原文
+   - 10分：仅给出摘要性回答，无具体证据
+   - 0分：答案过于笼统或纯属臆测
 
    **Few-Shot 示例**:
 
-   示例1 - 低分 (depth=5):
+   示例1 - 低分 (depth=10):
    问题: "薇尔米娜为什么加入愚人众？"
-   Tool output 包含: "薇尔米娜：（与其让它被外人偷走…不如，就让它成为我加入「愚人众」的敲门砖…）"
    答案: "薇尔米娜加入愚人众是为了摆脱命运。"
-   评分理由: 仅复述摘要，未引用具体对话，depth=5
+   评分理由: 仅复述摘要，未引用具体对话，depth=10
 
-   示例2 - 高分 (depth=20):
+   示例2 - 高分 (depth=25):
    问题: "薇尔米娜为什么加入愚人众？"
-   Tool output 同上
    答案: "根据第2章任务1601的对话，薇尔米娜的内心独白显示她的动机：'虚无的祈祷…还有今天加普依顽固的信仰…我只知道，这不是我要的生活…'。她发现旅行者打开了秘所后，决定'与其让它被外人偷走…不如，就让它成为我加入「愚人众」的敲门砖'。"
-   评分理由: 引用了具体对话原文，解释了动机链，depth=20
+   评分理由: 引用了具体对话原文，解释了动机链，depth=25
 
 ## 特别注意
 
-**工具输出截断说明**：
-- 为控制 prompt 长度，tool output 可能只显示前 2000 字符
-- 因此在评估时要考虑：完整输出可能包含更多证据
-- 如果答案与显示的 tool output 不矛盾，即使找不到精确支持也不应轻易判定为幻觉
-
-**幻觉检测（严格定义）**：
-- 幻觉是指：与 tool output 直接矛盾的内容
-- 以下情况不是幻觉：
-  - 对 tool output 内容的总结、归纳、重新表述
-  - 从多个 tool output 综合推理出的结论
-  - 使用实体的别名/全名（如"少女"="露珠"）
-  - 基于 tool output 的合理推断（如 A→B 且 B→C，则推断 A→C）
-  - 无法在截断后的 tool output 中验证、但也不矛盾的内容
-- 只有当答案与 tool output 直接矛盾时才标记为幻觉
+**不要验证引用内容**：
+- Agent 可能使用了多轮对话的上下文信息，这些信息不一定出现在当前工具调用记录中
+- 如果答案引用了具体的章节/任务ID，信任这些引用，不要因为"在工具输出中找不到"而扣分
+- 只关注答案本身的质量（完整性、深度、是否有具体细节），不关注内容来源验证
 
 **关系类问题的深度检查**：
-- 如果答案只说"X和Y有互动关系/是朋友/是敌人"而没有描述具体事件，答案深度必须≤5分
+- 如果答案只说"X和Y有互动关系/是朋友/是敌人"而没有描述具体事件，答案深度必须≤10分
 - 充分的关系描述应包含：具体发生了什么、在什么情境下、关系如何发展
 - 只调用 find_connection 而没有调用 search_memory 的关系类回答，通常深度不足
 
@@ -134,16 +100,14 @@ GRADER_PROMPT = """你是一个答案质量评估器。请评估以下答案是�
 {{
     "question_type": "<关系类/事实类/历程类/细节类>",
     "scores": {{
-        "tool_usage": <0-20>,
-        "evidence": <0-20>,
-        "completeness": <0-20>,
-        "citation": <0-20>,
-        "depth": <0-20>
+        "tool_usage": <0-25>,
+        "completeness": <0-25>,
+        "citation": <0-25>,
+        "depth": <0-25>
     }},
     "score": <0-100 总分>,
     "reason": "<简短理由，一句话>",
-    "suggestion": "<如果未通过，给出具体改进建议>",
-    "hallucination_detected": "<如果发现答案中有 tool output 不支持的内容，列出这些内容>"
+    "suggestion": "<如果未通过，给出具体改进建议>"
 }}
 ```
 """
@@ -155,9 +119,9 @@ class AnswerGrader:
 
     Uses an independent LLM call to score answers on 4 dimensions:
     1. Tool usage (did the agent verify with tools?)
-    2. Evidence (is the answer based on tool results?)
-    3. Completeness (does it fully answer the question?)
-    4. Citation (are sources cited?)
+    2. Completeness (does it fully answer the question?)
+    3. Citation (are sources cited?)
+    4. Depth (does it include specific evidence?)
     """
 
     def __init__(self, llm):
@@ -229,7 +193,6 @@ class AnswerGrader:
                 # 硬性门槛检查
                 depth_score = result.get("scores", {}).get("depth", 0)
                 citation_score = result.get("scores", {}).get("citation", 0)
-                evidence_score = result.get("scores", {}).get("evidence", 0)
                 total_score = result.get("score", 0)
 
                 # 按优先级检查各门槛
@@ -245,12 +208,6 @@ class AnswerGrader:
                     if not result.get("suggestion"):
                         result["suggestion"] = "答案缺乏来源引用，请在回答中明确引用 Chapter/Task ID"
                     logger.info(f"Hard threshold failed: citation={citation_score}")
-                elif evidence_score < EVIDENCE_HARD_THRESHOLD:
-                    result["passed"] = False
-                    result["fail_reason"] = f"evidence={evidence_score} < {EVIDENCE_HARD_THRESHOLD} (硬性门槛)"
-                    if not result.get("suggestion"):
-                        result["suggestion"] = "答案证据支持不足，请确保回答基于工具返回的实际内容"
-                    logger.info(f"Hard threshold failed: evidence={evidence_score}")
                 elif total_score >= SCORE_THRESHOLD:
                     result["passed"] = True
                     result["fail_reason"] = None
@@ -277,7 +234,6 @@ class AnswerGrader:
             "question_type": "未知",
             "scores": {
                 "tool_usage": 0,
-                "evidence": 0,
                 "completeness": 0,
                 "citation": 0,
                 "depth": 0,

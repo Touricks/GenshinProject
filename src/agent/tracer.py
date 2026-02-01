@@ -10,11 +10,20 @@ Captures the complete execution trace of the ReAct agent including:
 import json
 import hashlib
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger(__name__)
+
+# 正则模式用于解析 ReAct 输出
+# Thought: <text> (直到遇到 Action, Thought, 或 Answer)
+THOUGHT_PATTERN = re.compile(r'Thought:\s*(.+?)(?=\n(?:Action|Thought|Answer)|$)', re.DOTALL)
+# Action: <tool_name>
+ACTION_PATTERN = re.compile(r'Action:\s*(\w+)')
+# Action Input: {<json>} - 使用非贪婪匹配到闭合括号
+ACTION_INPUT_PATTERN = re.compile(r'Action Input:\s*(\{[^}]*\})')
 
 
 class AgentTracer:
@@ -263,6 +272,39 @@ class AgentTracer:
 
         logger.debug(f"[Tracer] Refiner generated {len(queries)} queries: {queries}")
 
+    def _parse_reasoning(self, raw_stream: str) -> Dict[str, List[str]]:
+        """解析 raw_stream 中的结构化推理组件。
+
+        Args:
+            raw_stream: ReAct agent 的原始输出流。
+
+        Returns:
+            包含 thoughts, actions, observations 的字典。
+        """
+        thoughts = THOUGHT_PATTERN.findall(raw_stream)
+        actions = ACTION_PATTERN.findall(raw_stream)
+        action_inputs = ACTION_INPUT_PATTERN.findall(raw_stream)
+
+        # 去重：LLM 可能在流式输出中重复输出相同的 Action
+        # 保留唯一的 (action, input) 对
+        seen = set()
+        unique_actions = []
+        unique_inputs = []
+        for i, action in enumerate(actions):
+            action_input = action_inputs[i] if i < len(action_inputs) else ""
+            key = (action, action_input)
+            if key not in seen:
+                seen.add(key)
+                unique_actions.append(action)
+                if action_input:
+                    unique_inputs.append(action_input)
+
+        return {
+            "thoughts": [t.strip() for t in thoughts if t.strip()],
+            "actions": unique_actions,
+            "observations": unique_inputs,
+        }
+
     def end_attempt(self, response: str):
         """End current attempt and add to trace.
 
@@ -271,6 +313,13 @@ class AgentTracer:
         """
         if self.current_attempt is None or self.current_trace is None:
             return
+
+        # 解析 raw_stream 填充结构化字段
+        raw_stream = self.current_attempt["reasoning"]["raw_stream"]
+        parsed = self._parse_reasoning(raw_stream)
+        self.current_attempt["reasoning"]["thoughts"] = parsed["thoughts"]
+        self.current_attempt["reasoning"]["actions"] = parsed["actions"]
+        self.current_attempt["reasoning"]["observations"] = parsed["observations"]
 
         self.current_attempt["response"] = response
         self.current_attempt["end_time"] = datetime.now().isoformat()
@@ -288,13 +337,15 @@ class AgentTracer:
         final_response: str,
         passed: bool,
         total_duration_ms: int,
+        humanized_response: str = None,
     ) -> str:
         """End trace and save to file.
 
         Args:
-            final_response: Final answer returned to user.
+            final_response: Final answer returned to user (原格式，带引用).
             passed: Whether grading passed.
             total_duration_ms: Total execution time.
+            humanized_response: Optional humanized answer (去引用后).
 
         Returns:
             Path to saved trace file.
@@ -303,6 +354,7 @@ class AgentTracer:
             return ""
 
         self.current_trace["final_response"] = final_response
+        self.current_trace["humanized_response"] = humanized_response  # 去引用后的回答
         self.current_trace["passed"] = passed
         self.current_trace["total_duration_ms"] = total_duration_ms
         self.current_trace["end_timestamp"] = datetime.now().isoformat()
