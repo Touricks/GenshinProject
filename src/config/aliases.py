@@ -31,7 +31,8 @@ CHARACTER_ALIASES: dict[str, str] = {
 
     # 哥伦比娅 - Columbina (少女)
     "少女": "哥伦比娅",
-    "库塔儿": "哥伦比娅",
+    "库塔尓": "哥伦比娅",
+    
     # 流浪者 - Wanderer
     "阿帽": "Wanderer",
     "散兵": "Wanderer",

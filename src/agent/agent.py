@@ -480,7 +480,7 @@ class GenshinRetrievalAgent:
                 "grade": grade_result,
                 "passed": grade_result.get("passed", False),
                 "fail_reason": grade_result.get("fail_reason"),
-                "tool_calls": len(attempt_tool_calls),
+                "tool_calls": attempt_tool_calls,  # 完整工具调用详情
             })
 
             # Log grade result with pass/fail info

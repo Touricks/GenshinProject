@@ -61,6 +61,52 @@ def _resolve_character_alias(name: str) -> str:
         return name
 
 
+def _get_all_character_names(name: str) -> List[str]:
+    """
+    获取角色的所有可能名称（用于 Qdrant 过滤）。
+
+    Qdrant 中存储的是对话原文中的角色名，可能与知识图谱的规范名不同。
+    例如：对话中使用 "少女"，但知识图谱规范名是 "哥伦比娅"。
+
+    此函数返回所有可能的名称，用于 MatchAny 过滤。
+
+    Args:
+        name: 用户输入的角色名
+
+    Returns:
+        包含原名和所有已知别名的列表
+    """
+    names = {name}  # 始终包含原名
+
+    # 1. 检查手动别名映射表
+    if name in CHARACTER_ALIASES:
+        canonical = CHARACTER_ALIASES[name]
+        names.add(canonical)
+        # 也添加指向同一规范名的其他别名
+        for alias, canon in CHARACTER_ALIASES.items():
+            if canon == canonical:
+                names.add(alias)
+    else:
+        # 检查 name 是否是规范名，找到所有指向它的别名
+        for alias, canon in CHARACTER_ALIASES.items():
+            if canon == name:
+                names.add(alias)
+
+    # 2. 尝试 Neo4j fulltext index 获取规范名
+    try:
+        searcher = _get_graph_searcher()
+        canonical = searcher._resolve_canonical_name(name)
+        if canonical != name:
+            names.add(canonical)
+    except Exception as e:
+        logger.warning(f"[Alias] Failed to resolve '{name}' for multi-name: {e}")
+
+    result = list(names)
+    if len(result) > 1:
+        logger.info(f"[Alias] Multi-name expansion: '{name}' -> {result}")
+    return result
+
+
 # 模块级单例，避免每次调用时重新加载模型
 _embedder: Optional[EmbeddingGenerator] = None
 _indexer: Optional[VectorIndexer] = None
@@ -144,13 +190,22 @@ def search_memory(
     # 生成查询嵌入向量
     query_vector = embedder.embed_single(query)
 
-    # 构建过滤条件（支持别名解析）
+    # 构建过滤条件（支持别名解析 + 多名称匹配）
     filter_conditions = None
     resolved_characters = None
+    all_character_names = None
     if characters:
-        # 解析角色别名为规范名称（如 "木偶" -> "桑多涅"）
+        # 获取角色的所有可能名称（原名 + 别名 + 规范名）
+        # 这解决了 Qdrant 存储原名但知识图谱使用规范名的不匹配问题
+        all_character_names = _get_all_character_names(characters)
         resolved_characters = _resolve_character_alias(characters)
-        filter_conditions = {"characters": resolved_characters}
+
+        if len(all_character_names) > 1:
+            # 多名称：使用 MatchAny 匹配任意一个
+            filter_conditions = {"characters": all_character_names}
+        else:
+            # 单名称：使用 MatchValue
+            filter_conditions = {"characters": resolved_characters}
 
     # 启发式扩展搜索：如果去重后不足 limit，则翻倍搜索
     # 这解决了同一 event 多个 chunk 导致重复结果的问题
@@ -236,6 +291,10 @@ def search_memory(
     if characters:
         if fallback_used:
             lines.append(f"（角色过滤无结果，已改用语义搜索：{resolved_characters}）")
+        elif all_character_names and len(all_character_names) > 1:
+            # 多名称匹配
+            names_str = " | ".join(all_character_names)
+            lines.append(f"（已过滤角色：{characters} → [{names_str}]）")
         elif resolved_characters and resolved_characters != characters:
             lines.append(f"（已过滤角色：{characters} → {resolved_characters}）")
         else:

@@ -12,8 +12,8 @@ from typing import List, Dict, Any
 logger = logging.getLogger(__name__)
 
 # 硬性门槛配置
-DEPTH_HARD_THRESHOLD = 10     # depth 分数必须 >= 10，否则直接不通过 (按比例调整: 8/20*25=10)
-CITATION_HARD_THRESHOLD = 0   # 禁用 citation 门槛（Agent 不会自动添加引用）
+DEPTH_HARD_THRESHOLD = 15     # depth 分数必须 >= 15，否则直接不通过 (关系类问题需要调用 search_memory)
+CITATION_HARD_THRESHOLD = 10   # citation 分数必须 >= 10，否则直接不通过 (按比例调整: 8/20*25=10)
 SCORE_THRESHOLD = 70          # 总分阈值
 
 

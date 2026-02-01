@@ -199,22 +199,31 @@ class VectorIndexer:
         Args:
             query_vector: Query embedding vector
             limit: Number of results to return
-            filter_conditions: Optional filter conditions
+            filter_conditions: Optional filter conditions.
+                - 单值: {"field": "value"} → MatchValue
+                - 多值: {"field": ["v1", "v2"]} → MatchAny (匹配任意一个)
             sort_by: Sort method ("relevance" or "time")
 
         Returns:
             List of search results with payload
         """
-        from qdrant_client.models import Filter, FieldCondition, MatchValue
+        from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
 
         # Build filter if provided
         qdrant_filter = None
         if filter_conditions:
             conditions = []
             for field, value in filter_conditions.items():
-                conditions.append(
-                    FieldCondition(key=field, match=MatchValue(value=value))
-                )
+                if isinstance(value, list):
+                    # 多值匹配：使用 MatchAny
+                    conditions.append(
+                        FieldCondition(key=field, match=MatchAny(any=value))
+                    )
+                else:
+                    # 单值匹配：使用 MatchValue
+                    conditions.append(
+                        FieldCondition(key=field, match=MatchValue(value=value))
+                    )
             qdrant_filter = Filter(must=conditions)
 
         # For time sorting, we might want to fetch more candidates to ensure
