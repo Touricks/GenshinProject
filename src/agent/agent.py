@@ -29,6 +29,10 @@ LIMIT_PROGRESSION = {
     3: 8,  # 第3轮 - 略微扩大
 }
 
+# 每个 attempt 的最大工具调用次数
+# 超过此限制后强制停止当前 attempt，使用已收集的信息评分
+MAX_TOOL_CALLS_PER_ATTEMPT = 4
+
 
 def _ensure_google_api_key():
     """
@@ -282,6 +286,7 @@ class GenshinRetrievalAgent:
 3. 使用平实、自然的中文表达，不要过于口语化或浮夸
 4. 不要添加"没问题"、"我来"等开场白，直接输出改写后的内容
 5. 保持原文的结构和层次
+6. 移除所有任务名引用，包括"名为《XXX》的任务"、"在《XXX》中"、"《XXX》任务"等格式，只保留事件描述本身
 
 原回答：
 {response}
@@ -311,7 +316,11 @@ class GenshinRetrievalAgent:
 
         logger.info(f"Running query: {query[:50]}...")
 
-        response = await self._agent.run(user_msg=query)
+        response = await self._agent.run(
+            user_msg=query,
+            max_iterations=MAX_TOOL_CALLS_PER_ATTEMPT,
+            early_stopping_method="generate",
+        )
         return str(response)
 
     async def chat(self, query: str) -> str:
@@ -328,7 +337,12 @@ class GenshinRetrievalAgent:
 
         logger.info(f"Chat query: {query[:50]}...")
 
-        response = await self._agent.run(user_msg=query, ctx=self._ctx)
+        response = await self._agent.run(
+            user_msg=query,
+            ctx=self._ctx,
+            max_iterations=MAX_TOOL_CALLS_PER_ATTEMPT,
+            early_stopping_method="generate",
+        )
         return str(response)
 
     async def chat_verbose(self, query: str) -> str:
@@ -347,7 +361,12 @@ class GenshinRetrievalAgent:
 
         logger.info(f"Verbose chat query: {query[:50]}...")
 
-        handler = self._agent.run(query, ctx=self._ctx)
+        handler = self._agent.run(
+            query,
+            ctx=self._ctx,
+            max_iterations=MAX_TOOL_CALLS_PER_ATTEMPT,
+            early_stopping_method="generate",
+        )
 
         async for event in handler.stream_events():
             if isinstance(event, AgentStream):
@@ -391,6 +410,9 @@ class GenshinRetrievalAgent:
             logger.warning("Grader not enabled, falling back to simple chat")
             return await self.chat(query), []
 
+        # Reset context at the start to prevent leakage from previous calls
+        self.reset_context()
+
         from llama_index.core.agent.workflow import ToolCallResult, AgentStream
 
         # Start trace
@@ -424,33 +446,57 @@ class GenshinRetrievalAgent:
                 self._tracer.log_context_injection(self._pending_context_summary)
                 self._pending_context_summary = None
 
-            # Run ReAct agent
-            handler = self._agent.run(current_query, ctx=self._ctx)
-
-            # Collect tool calls and reasoning stream
+            # Run ReAct agent with max_iterations limit
+            # Retry logic for empty message errors (gemini-2.5-flash issue)
+            MAX_EMPTY_MESSAGE_RETRIES = 2
+            empty_message_retries = 0
             attempt_tool_calls = []
-            async for event in handler.stream_events():
-                if isinstance(event, ToolCallResult):
-                    tool_output = str(event.tool_output)
-                    # 增加截断长度到 2000 字符，确保完整的 chunk 内容不被截断
-                    # 之前 500 字符导致关键证据（如角色死亡对话）被截断
-                    attempt_tool_calls.append({
-                        "tool": event.tool_name,
-                        "kwargs": event.tool_kwargs,
-                        "output": tool_output[:2000],
-                    })
-                    # Log tool call to tracer
-                    self._tracer.log_tool_call(
-                        tool=event.tool_name,
-                        input_data=event.tool_kwargs,
-                        output=tool_output,
-                    )
-                elif isinstance(event, AgentStream):
-                    # Log reasoning stream
-                    self._tracer.log_reasoning_stream(event.delta)
 
-            response = await handler
-            answer = str(response)
+            while empty_message_retries <= MAX_EMPTY_MESSAGE_RETRIES:
+                try:
+                    handler = self._agent.run(
+                        current_query,
+                        ctx=self._ctx,
+                        max_iterations=MAX_TOOL_CALLS_PER_ATTEMPT,
+                        early_stopping_method="generate",
+                    )
+
+                    # Collect tool calls and reasoning stream
+                    attempt_tool_calls = []
+                    async for event in handler.stream_events():
+                        if isinstance(event, ToolCallResult):
+                            tool_output = str(event.tool_output)
+                            attempt_tool_calls.append({
+                                "tool": event.tool_name,
+                                "kwargs": event.tool_kwargs,
+                                "output": tool_output[:6000],
+                            })
+                            # Log tool call to tracer
+                            self._tracer.log_tool_call(
+                                tool=event.tool_name,
+                                input_data=event.tool_kwargs,
+                                output=tool_output,
+                            )
+                        elif isinstance(event, AgentStream):
+                            # Log reasoning stream
+                            self._tracer.log_reasoning_stream(event.delta)
+
+                    response = await handler
+                    answer = str(response)
+                    break  # Success, exit retry loop
+
+                except ValueError as e:
+                    if "Got empty message" in str(e):
+                        empty_message_retries += 1
+                        logger.warning(
+                            f"Got empty message, retry {empty_message_retries}/{MAX_EMPTY_MESSAGE_RETRIES}"
+                        )
+                        if empty_message_retries > MAX_EMPTY_MESSAGE_RETRIES:
+                            raise  # Exceeded retries, re-raise
+                        # Reset context and retry
+                        self.reset_context()
+                    else:
+                        raise  # Other ValueError, re-raise
             tool_calls_history.extend(attempt_tool_calls)
 
             # Grade the answer

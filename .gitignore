@@ -9,6 +9,7 @@
 .devkit/
 .cache/
 docs_internal/
+publish/
 CLAUDE.md
 
 # Data (large files, stored externally)

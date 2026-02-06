@@ -92,6 +92,11 @@ GRADER_PROMPT = """你是一个答案质量评估器。请评估以下答案是�
 - 充分的关系描述应包含：具体发生了什么、在什么情境下、关系如何发展
 - 只调用 find_connection 而没有调用 search_memory 的关系类回答，通常深度不足
 
+**"不知道"结论的处理**：
+- 如果答案的最终结论是"角色说不知道"、"无法确定"、"没有找到相关信息"等，completeness 必须 ≤10 分
+- 这类答案只是复述了表面信息，没有完成推理任务
+- Agent 应该继续搜索间接证据，推理出真正的答案，而不是停留在"原文说不知道"
+
 ## 输出格式
 
 请严格返回以下JSON格式（不要添加任何其他文字）：
@@ -151,11 +156,10 @@ class AnswerGrader:
             Dict with keys: score (0-100), reason, suggestion, scores (breakdown)
         """
         # Format tool calls for the prompt
-        # 增加截断长度到 2000 字符，确保完整 chunk 内容不被截断
-        # 之前 800 字符导致关键证据（如角色死亡对话）被截断
+        # 增加截断长度到 6000 字符，确保完整 chunk 内容不被截断
         if tool_calls:
             tool_calls_str = "\n".join([
-                f"- {tc['tool']}({tc['kwargs']}) → {tc['output'][:2000]}..."
+                f"- {tc['tool']}({tc['kwargs']}) → {tc['output'][:6000]}..."
                 for tc in tool_calls
             ])
         else:
@@ -189,6 +193,24 @@ class AnswerGrader:
                     result["reason"] = "评估完成"
                 if "suggestion" not in result:
                     result["suggestion"] = ""
+
+                # 检测"不知道"作为最终结论 (最高优先级)
+                # 使用 LLM 判断答案是否真正回答了问题
+                if await self._is_unknown_conclusion_async(question, answer):
+                    result["scores"]["completeness"] = min(
+                        result.get("scores", {}).get("completeness", 0), 10
+                    )
+                    result["unknown_as_conclusion"] = True
+                    result["passed"] = False
+                    result["fail_reason"] = "答案以'不知道'作为最终结论，需要继续推理"
+                    result["suggestion"] = (
+                        "答案停留在'角色说不知道'，请继续调用工具寻找间接证据，"
+                        "推理出真正的答案（如时间线闭环、隐含因果等）"
+                    )
+                    # 重新计算总分
+                    result["score"] = sum(result.get("scores", {}).values())
+                    logger.info("Unknown conclusion detected by LLM, forcing retry")
+                    return result
 
                 # 硬性门槛检查
                 depth_score = result.get("scores", {}).get("depth", 0)
@@ -244,6 +266,49 @@ class AnswerGrader:
             "reason": reason,
             "suggestion": "请重试或检查答案格式",
         }
+
+    async def _is_unknown_conclusion_async(self, question: str, answer: str) -> bool:
+        """
+        使用 LLM 检测答案是否以"不知道"作为最终结论。
+
+        Args:
+            question: 用户的问题。
+            answer: Agent 的回答文本。
+
+        Returns:
+            True 如果答案的最终结论是"不知道"或"无法确定"。
+        """
+        prompt = f"""请判断以下回答是否**真正回答了**用户的问题。
+
+## 用户问题
+{question}
+
+## Agent 回答
+{answer}
+
+## 判断标准
+
+请判断回答的**最终结论**是什么：
+- 如果回答给出了明确的答案（如"是X"、"因为Y"、"由Z造成"），返回 "HAS_ANSWER"
+- 如果回答的最终结论是"不知道"、"无法确定"、"没有找到相关信息"，返回 "NO_ANSWER"
+
+**注意**：
+- 如果回答中提到"角色说不知道"但同时给出了真正的答案，这是 HAS_ANSWER
+- 只有当回答本身没有给出结论时，才是 NO_ANSWER
+
+## 输出格式
+只返回一个词：HAS_ANSWER 或 NO_ANSWER"""
+
+        try:
+            response = await self.llm.acomplete(prompt)
+            result = str(response).strip().upper()
+            is_unknown = "NO_ANSWER" in result
+            if is_unknown:
+                logger.info("LLM detected answer has no conclusion (NO_ANSWER)")
+            return is_unknown
+        except Exception as e:
+            logger.warning(f"Unknown conclusion check failed: {e}, defaulting to False")
+            return False
 
 
 def grade_sync(
